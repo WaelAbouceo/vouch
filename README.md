@@ -123,6 +123,31 @@ Capabilities inferred: network access, shell execution, dynamic code execution,
 filesystem read/write, credential access, persistence, environment access. Also
 available as the MCP tool `skill_cv` and the API endpoint `POST /cv/text`.
 
+### Agent CV — profile a whole agent
+
+Where a Skill CV profiles one skill, an **Agent CV** profiles an *agent* — every
+skill it has loaded — and rolls them up into a single trust posture (worst-of
+verdict, agent-wide capabilities, per-skill breakdown). One malicious skill
+quarantines the whole agent.
+
+```bash
+validate-skill ./my-agent-dir --agent-cv               # aggregate card
+validate-skill ./my-agent-dir --agent-cv --markdown    # table for reports
+validate-skill ./my-agent-dir --agent-cv --json        # structured data
+```
+
+```python
+from skill_validator import build_agent_cv
+
+agent = build_agent_cv("./examples/example-agent", use_llm=False)
+print(agent.verdict, agent.recommendation)   # Verdict.MALICIOUS  QUARANTINE ...
+for s in agent.skills:
+    print(s.verdict, s.risk_score, s.name)
+```
+
+An "agent" is any directory containing one or more skills (folders with a
+`SKILL.md`); discovery finds them all automatically.
+
 ## Use it in CI (GitHub Action)
 
 Block unsafe skills on every pull request:

@@ -83,6 +83,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Render a Skill CV (profile card) instead of the plain report.",
     )
     p.add_argument(
+        "--agent-cv",
+        action="store_true",
+        help="Treat the target as an agent (a tree of skills) and render an "
+        "aggregate Agent CV.",
+    )
+    p.add_argument(
         "--markdown",
         action="store_true",
         help="With --cv, render the CV as Markdown instead of a terminal card.",
@@ -115,6 +121,33 @@ def main(argv: list[str] | None = None) -> int:
     elif args.llm:
         use_llm = True
 
+    color = sys.stdout.isatty() and not args.no_color
+
+    # Agent CV: aggregate every skill under the target directory.
+    if args.agent_cv:
+        from . import agent as agent_mod
+
+        if args.target == "-":
+            print("error: --agent-cv requires a directory, not stdin.", file=sys.stderr)
+            return 3
+        agent_cv = agent_mod.build_agent_cv(
+            args.target, use_llm=use_llm, model=args.model
+        )
+        if args.json:
+            import json as _json
+
+            print(_json.dumps(agent_cv.to_dict(), indent=2))
+        elif args.markdown:
+            print(agent_mod.render_markdown(agent_cv))
+        else:
+            print(agent_mod.render_text(agent_cv, color=color))
+        verdict = agent_cv.verdict
+        if args.fail_on == "never":
+            return 0
+        if args.fail_on == "suspicious":
+            return 0 if verdict == Verdict.VALID else _EXIT[verdict]
+        return 2 if verdict == Verdict.MALICIOUS else 0
+
     if args.target == "-":
         skill = loader.load_text(sys.stdin.read(), name="stdin-skill")
     else:
@@ -123,8 +156,6 @@ def main(argv: list[str] | None = None) -> int:
         except FileNotFoundError as e:
             print(f"error: {e}", file=sys.stderr)
             return 3
-
-    color = sys.stdout.isatty() and not args.no_color
 
     if args.cv:
         from . import cv as cv_mod

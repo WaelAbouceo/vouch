@@ -8,11 +8,13 @@ Each returns a :class:`~skill_validator.models.Report` with a ``verdict`` of
 ``"valid"``, ``"suspicious"`` or ``"malicious"``.
 """
 
+from .agent import AgentCV, build_agent_cv, discover_skills
 from .cv import SkillCV, build_cv, render_markdown, render_text
 from .engine import Engine, validate_path, validate_skill, validate_text
 from .models import Finding, Report, Severity, SkillInput, Verdict
 
 __all__ = [
+    "AgentCV",
     "Engine",
     "Finding",
     "Report",
@@ -20,7 +22,9 @@ __all__ = [
     "SkillCV",
     "SkillInput",
     "Verdict",
+    "build_agent_cv",
     "build_cv",
+    "discover_skills",
     "render_markdown",
     "render_text",
     "validate_path",
