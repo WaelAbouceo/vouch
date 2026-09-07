@@ -7,8 +7,6 @@ Public API
 
 Each validator returns a :class:`~vouch.models.Report` with a ``verdict`` of
 ``"valid"``, ``"suspicious"`` or ``"malicious"``.
-
-The previous import path ``skill_validator`` still works via a deprecated shim.
 """
 
 from .agent import AgentCV, build_agent_cv, discover_skills

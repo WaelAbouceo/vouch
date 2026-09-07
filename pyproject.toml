@@ -43,10 +43,6 @@ all = [
 vouch = "vouch.cli:main"
 vouch-api = "vouch.api:run"
 vouch-mcp = "vouch.mcp_server:main"
-# Back-compat aliases (deprecated):
-validate-skill = "vouch.cli:main"
-skill-validator-api = "vouch.api:run"
-skill-validator-mcp = "vouch.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

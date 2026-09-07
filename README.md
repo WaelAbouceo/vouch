@@ -10,10 +10,6 @@ what it can do, and vouch only for the ones that are safe to run.
 
 > _References for your agents — never run a skill you can't vouch for._
 
-> ℹ️ **Renamed:** this project was formerly `skill-validator`. The `vouch` CLI is
-> the primary command; `validate-skill` still works as a deprecated alias, and
-> `import skill_validator` still resolves to `vouch`.
-
 A "Skill" is a package of instructions (`SKILL.md`) plus optional scripts that an
 autonomous agent will read and may execute. Before an agent loads a skill, this
 toolkit audits it for prompt injection, data exfiltration, destructive commands,

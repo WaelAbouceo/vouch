@@ -1,4 +1,4 @@
-"""Command-line interface: ``vouch`` (alias: ``validate-skill``).
+"""Command-line interface: ``vouch``.
 
 Examples
 --------

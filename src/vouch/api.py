@@ -78,10 +78,7 @@ def create_app():
     def validate_path_endpoint(req: PathRequest) -> dict:
         # Guard: local-path validation is disabled unless explicitly allowed,
         # since it exposes the host filesystem to callers.
-        allow = os.environ.get("VOUCH_ALLOW_PATH") or os.environ.get(
-            "SKILL_VALIDATOR_ALLOW_PATH"
-        )
-        if allow != "1":
+        if os.environ.get("VOUCH_ALLOW_PATH") != "1":
             raise HTTPException(
                 status_code=403,
                 detail="Path validation disabled. Set VOUCH_ALLOW_PATH=1 "
