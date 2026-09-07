@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skill-validator"
+version = "0.2.0"
+description = "Security & analysis toolkit for agent Skills: validate (valid/suspicious/malicious) and profile (Skill CV) via hybrid static + LLM analysis."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "SKILLS_RGB" }]
+keywords = [
+  "security",
+  "agents",
+  "skills",
+  "static-analysis",
+  "prompt-injection",
+  "skill-cv",
+  "mcp",
+  "cursor-sdk",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+api = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2"]
+mcp = ["mcp>=1.2.0"]
+llm = ["cursor-sdk>=0.1.0"]
+dev = ["pytest>=8", "ruff>=0.5"]
+all = [
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "pydantic>=2",
+  "mcp>=1.2.0",
+  "pytest>=8",
+  "ruff>=0.5",
+]
+
+[project.scripts]
+validate-skill = "skill_validator.cli:main"
+skill-validator-api = "skill_validator.api:run"
+skill-validator-mcp = "skill_validator.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

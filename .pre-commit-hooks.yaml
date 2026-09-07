@@ -1,0 +1,7 @@
+- id: skill-validator
+  name: Validate agent skills
+  description: Scan SKILL.md skills for malicious behavior; block unsafe skills.
+  entry: validate-skill
+  language: python
+  files: (^|/)SKILL\.md$
+  args: ["--no-llm", "--no-color", "--fail-on", "malicious"]
