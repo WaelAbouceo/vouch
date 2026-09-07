@@ -204,10 +204,40 @@ vouch ./my-skill --llm
 
 1. Every file is scanned by the static rule set (`src/vouch/rules.py`),
    producing severity-weighted findings.
-2. If enabled, an LLM auditor reviews the skill and contributes its own findings.
-3. Findings are aggregated into a 0–100 risk score (highest-severity findings
+2. Capabilities are inferred (`src/vouch/capabilities.py`) and a **capability
+   gate** is applied (see below).
+3. If enabled, an LLM auditor reviews the skill and contributes its own findings.
+4. Findings are aggregated into a 0–100 risk score (highest-severity findings
    dominate; extras decay to avoid noise). Any `CRITICAL` finding, or a score
    ≥ 55, yields `malicious`; ≥ 20 yields `suspicious`; otherwise `valid`.
+
+### The capability gate (why `valid` is a filter, not a guarantee)
+
+A clean rule sweep is **not** proof of safety. The dangerous minority of skills
+are deliberately evasive multi-stage chains whose individual steps each look
+benign — exactly what static analysis and a single LLM pass are weakest against.
+So Vouch also gates on **capability composition**:
+
+> A skill that exhibits a dangerous capability combination — **network +
+> credential access**, **network + shell execution**, **network + dynamic code
+> execution**, or the full **network + credentials + shell** chain — can **never
+> return a clean `valid` from a static-only pass**, regardless of risk score. It
+> is floored to `suspicious` with `review_required=true`.
+
+That floor lifts **only** if the LLM auditor actually ran (`--llm` /
+`CURSOR_API_KEY`) or a human explicitly signs off (`--sign-off`). Notably, if you
+*asked* for the LLM but it wasn't available and the run degraded to static-only,
+the gate **stays** — Vouch fails safe rather than handing out a false negative on
+the precise profile you don't want to miss.
+
+```bash
+vouch ./my-skill --no-llm            # dangerous combo -> suspicious (review required)
+vouch ./my-skill --llm               # LLM audit satisfies the gate
+vouch ./my-skill --sign-off          # human review satisfies the gate
+```
+
+The report exposes `capabilities`, `review_required`, and `review_reasons` so
+callers can act on the gate programmatically.
 
 ## Project layout
 
@@ -216,8 +246,9 @@ src/vouch/
   models.py       # Verdict, Severity, Finding, Report, SkillInput
   loader.py       # directory / file / raw-text loading
   rules.py        # static analysis rule set
+  capabilities.py # capability inference (network/shell/creds/... )
   llm.py          # optional Cursor SDK auditor
-  engine.py       # hybrid scoring + public API (validate_path/text/skill)
+  engine.py       # hybrid scoring + capability gate + public API
   cv.py           # Skill CV: capability inference + profile renderers
   agent.py        # Agent CV: discover + aggregate all of an agent's skills
   cli.py          # vouch (validation + --cv + --agent-cv)

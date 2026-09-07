@@ -50,7 +50,14 @@ def _render(report: Report, color: bool) -> str:
     )
     lines.append(f"Skill:   {report.skill_name}")
     lines.append(f"Engine:  {report.engine} (llm_used={report.llm_used})")
+    if report.capabilities:
+        lines.append(f"Caps:    {', '.join(report.capabilities)}")
     lines.append(f"Summary: {report.summary}")
+    if report.review_required:
+        warn = "⚠ REVIEW REQUIRED (capability gate): run with --llm or --sign-off"
+        lines.append(_c(warn, "\033[33m", color))
+        for reason in report.review_reasons:
+            lines.append(f"         - {reason}")
     if report.findings:
         lines.append("")
         lines.append(f"Findings ({len(report.findings)}):")
@@ -102,6 +109,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable the LLM auditor (static analysis only).",
     )
     p.add_argument("--llm", action="store_true", help="Force-enable the LLM auditor.")
+    p.add_argument(
+        "--sign-off",
+        action="store_true",
+        help="Human sign-off: lift the capability review gate (allow a 'valid' "
+        "verdict despite a dangerous capability combination).",
+    )
     p.add_argument("--model", default=None, help="Override the LLM model id.")
     p.add_argument(
         "--no-color", action="store_true", help="Disable ANSI colors in text output."
@@ -134,7 +147,10 @@ def main(argv: list[str] | None = None) -> int:
             print("error: --agent-cv requires a directory, not stdin.", file=sys.stderr)
             return 3
         agent_cv = agent_mod.build_agent_cv(
-            args.target, use_llm=use_llm, model=args.model
+            args.target,
+            use_llm=use_llm,
+            model=args.model,
+            human_signoff=args.sign_off,
         )
         if args.json:
             import json as _json
@@ -163,7 +179,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cv:
         from . import cv as cv_mod
 
-        skill_cv = cv_mod.build_cv(skill, use_llm=use_llm, model=args.model)
+        skill_cv = cv_mod.build_cv(
+            skill, use_llm=use_llm, model=args.model, human_signoff=args.sign_off
+        )
         report = skill_cv.report
         if args.json:
             import json as _json
@@ -174,7 +192,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(cv_mod.render_text(skill_cv, color=color))
     else:
-        report = validate_skill(skill, use_llm=use_llm, model=args.model)
+        report = validate_skill(
+            skill, use_llm=use_llm, model=args.model, human_signoff=args.sign_off
+        )
         if args.json:
             print(report.to_json())
         else:

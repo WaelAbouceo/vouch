@@ -110,6 +110,11 @@ class Report:
     summary: str = ""
     engine: str = "hybrid"  # "static" | "hybrid"
     llm_used: bool = False
+    capabilities: list[str] = field(default_factory=list)
+    # True when a dangerous capability combination requires LLM or human review
+    # that has not happened yet (verdict was floored, not cleared).
+    review_required: bool = False
+    review_reasons: list[str] = field(default_factory=list)
 
     @property
     def is_malicious(self) -> bool:
@@ -122,6 +127,9 @@ class Report:
             "risk_score": self.risk_score,
             "engine": self.engine,
             "llm_used": self.llm_used,
+            "capabilities": self.capabilities,
+            "review_required": self.review_required,
+            "review_reasons": self.review_reasons,
             "summary": self.summary,
             "findings": [f.to_dict() for f in self.findings],
         }

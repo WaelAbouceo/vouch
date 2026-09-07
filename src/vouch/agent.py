@@ -105,6 +105,7 @@ def build_agent_cv(
     use_llm: bool | None = None,
     model: str | None = None,
     api_key: str | None = None,
+    human_signoff: bool = False,
 ) -> AgentCV:
     """Build an Agent CV by profiling every skill discovered under ``root``."""
     skill_dirs = discover_skills(root)
@@ -113,7 +114,13 @@ def build_agent_cv(
     for sd in skill_dirs:
         skill = loader.load(str(sd))
         skill_cvs.append(
-            build_cv(skill, use_llm=use_llm, model=model, api_key=api_key)
+            build_cv(
+                skill,
+                use_llm=use_llm,
+                model=model,
+                api_key=api_key,
+                human_signoff=human_signoff,
+            )
         )
 
     worst = Verdict.VALID
