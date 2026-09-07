@@ -32,7 +32,7 @@ runs:
 
     - name: Install vouch
       shell: bash
-      run: python -m pip install --quiet "vouch @ git+https://github.com/OWNER/REPO@main" || python -m pip install --quiet vouch
+      run: python -m pip install --quiet "vouch @ git+https://github.com/WaelAbouceo/vouch@main" || python -m pip install --quiet vouch
 
     - name: Scan skills
       shell: bash

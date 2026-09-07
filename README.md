@@ -1,6 +1,6 @@
 # Vouch
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/WaelAbouceo/vouch/actions/workflows/ci.yml/badge.svg)](https://github.com/WaelAbouceo/vouch/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/vouch.svg)](https://pypi.org/project/vouch/)
 [![Python](https://img.shields.io/pypi/pyversions/vouch.svg)](https://pypi.org/project/vouch/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -166,7 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: OWNER/REPO@main        # this repo's action.yml
+      - uses: WaelAbouceo/vouch@main        # this repo's action.yml
         with:
           path: .                    # scans every SKILL.md found
           fail-on: malicious         # or: suspicious | never
@@ -177,7 +177,7 @@ jobs:
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/OWNER/REPO
+  - repo: https://github.com/WaelAbouceo/vouch
     rev: v0.3.0
     hooks:
       - id: vouch
