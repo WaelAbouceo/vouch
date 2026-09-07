@@ -2,13 +2,13 @@
 
 Run with::
 
-    skill-validator-api                 # uvicorn on 0.0.0.0:8000
+    vouch-api                           # uvicorn on 0.0.0.0:8000
     # or
-    uvicorn skill_validator.api:app --reload
+    uvicorn vouch.api:app --reload
 
 Requires the ``api`` extra::
 
-    pip install "skill-validator[api]"
+    pip install "vouch[api]"
 
 Endpoints
 ---------
@@ -29,16 +29,16 @@ def create_app():
     except Exception as e:  # pragma: no cover - import guard
         raise SystemExit(
             "FastAPI is required. Install with: pip install "
-            '"skill-validator[api]"'
+            '"vouch[api]"'
         ) from e
 
     from . import loader
     from .engine import validate_skill
 
     app = FastAPI(
-        title="Skill Validator",
-        version="0.1.0",
-        description="Classify agent Skills as valid, suspicious, or malicious.",
+        title="Vouch",
+        version="0.3.0",
+        description="Vet agent Skills; classify as valid, suspicious, or malicious.",
     )
 
     class TextRequest(BaseModel):
@@ -78,10 +78,13 @@ def create_app():
     def validate_path_endpoint(req: PathRequest) -> dict:
         # Guard: local-path validation is disabled unless explicitly allowed,
         # since it exposes the host filesystem to callers.
-        if os.environ.get("SKILL_VALIDATOR_ALLOW_PATH") != "1":
+        allow = os.environ.get("VOUCH_ALLOW_PATH") or os.environ.get(
+            "SKILL_VALIDATOR_ALLOW_PATH"
+        )
+        if allow != "1":
             raise HTTPException(
                 status_code=403,
-                detail="Path validation disabled. Set SKILL_VALIDATOR_ALLOW_PATH=1 "
+                detail="Path validation disabled. Set VOUCH_ALLOW_PATH=1 "
                 "to enable local filesystem access.",
             )
         try:
@@ -94,7 +97,7 @@ def create_app():
     return app
 
 
-# Module-level app for `uvicorn skill_validator.api:app`.
+# Module-level app for `uvicorn vouch.api:app`.
 try:  # pragma: no cover - only succeeds when FastAPI is installed
     app = create_app()
 except SystemExit:
@@ -104,9 +107,9 @@ except SystemExit:
 def run() -> None:  # pragma: no cover - thin runner
     import uvicorn
 
-    host = os.environ.get("SKILL_VALIDATOR_HOST", "0.0.0.0")
-    port = int(os.environ.get("SKILL_VALIDATOR_PORT", "8000"))
-    uvicorn.run("skill_validator.api:app", host=host, port=port)
+    host = os.environ.get("VOUCH_HOST", "0.0.0.0")
+    port = int(os.environ.get("VOUCH_PORT", "8000"))
+    uvicorn.run("vouch.api:app", host=host, port=port)
 
 
 if __name__ == "__main__":  # pragma: no cover

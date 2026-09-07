@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from skill_validator import validate_path, validate_text
-from skill_validator.models import Verdict
+from vouch import validate_path, validate_text
+from vouch.models import Verdict
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 

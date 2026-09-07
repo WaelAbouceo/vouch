@@ -15,7 +15,9 @@ from dataclasses import dataclass
 
 from .models import Finding, Severity, SkillInput
 
-DEFAULT_MODEL = os.environ.get("SKILL_VALIDATOR_MODEL", "composer-2.5")
+DEFAULT_MODEL = os.environ.get(
+    "VOUCH_MODEL", os.environ.get("SKILL_VALIDATOR_MODEL", "composer-2.5")
+)
 
 _SEVERITY_MAP = {
     "info": Severity.INFO,

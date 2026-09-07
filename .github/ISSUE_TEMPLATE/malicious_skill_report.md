@@ -14,6 +14,6 @@ labels: ["report", "security"]
 <paste here>
 ```
 
-**Did skill-validator catch it?** (paste `validate-skill <path> --json` output)
+**Did vouch catch it?** (paste `vouch <path> --json` output)
 
 **Verdict you expected:** valid / suspicious / malicious

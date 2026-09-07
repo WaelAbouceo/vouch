@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from skill_validator import build_cv, render_markdown, render_text
-from skill_validator.cv import parse_frontmatter, scan_capabilities
-from skill_validator.loader import load_text
-from skill_validator.models import Verdict
+from vouch import build_cv, render_markdown, render_text
+from vouch.cv import parse_frontmatter, scan_capabilities
+from vouch.loader import load_text
+from vouch.models import Verdict
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 

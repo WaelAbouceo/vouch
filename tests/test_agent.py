@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from skill_validator import build_agent_cv, discover_skills
-from skill_validator.agent import render_markdown, render_text
-from skill_validator.models import Verdict
+from vouch import build_agent_cv, discover_skills
+from vouch.agent import render_markdown, render_text
+from vouch.models import Verdict
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 AGENT = EXAMPLES / "example-agent"

@@ -1,12 +1,14 @@
-"""Command-line interface: ``validate-skill``.
+"""Command-line interface: ``vouch`` (alias: ``validate-skill``).
 
 Examples
 --------
-    validate-skill ./my-skill/                 # validate a skill directory
-    validate-skill ./SKILL.md                  # validate a single file
-    echo "..." | validate-skill -              # validate raw text from stdin
-    validate-skill ./my-skill/ --json          # machine-readable output
-    validate-skill ./my-skill/ --no-llm        # static analysis only
+    vouch ./my-skill/                 # vet a skill directory
+    vouch ./SKILL.md                  # vet a single file
+    echo "..." | vouch -              # vet raw text from stdin
+    vouch ./my-skill/ --cv            # render a Skill CV
+    vouch ./my-agent/ --agent-cv      # render an Agent CV
+    vouch ./my-skill/ --json          # machine-readable output
+    vouch ./my-skill/ --no-llm        # static analysis only
 """
 
 from __future__ import annotations
@@ -69,8 +71,9 @@ def _render(report: Report, color: bool) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="validate-skill",
-        description="Classify an agent Skill as valid, suspicious, or malicious.",
+        prog="vouch",
+        description="Vet an agent Skill (or agent) and vouch for it: "
+        "classify as valid, suspicious, or malicious.",
     )
     p.add_argument(
         "target",

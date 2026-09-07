@@ -13,7 +13,7 @@ ruff check .
 
 ## Add a detection rule
 
-Rules live in [`src/skill_validator/rules.py`](src/skill_validator/rules.py).
+Rules live in [`src/vouch/rules.py`](src/vouch/rules.py).
 Each rule is a `Rule(...)` with a stable ID, a title, a `Severity`, a compiled
 regex, and a human-readable `detail`.
 

@@ -1,8 +1,8 @@
 """Tests for the static rule engine."""
 
-from skill_validator import loader
-from skill_validator.models import Severity
-from skill_validator.rules import run_rules
+from vouch import loader
+from vouch.models import Severity
+from vouch.rules import run_rules
 
 
 def _findings_for(text: str):

@@ -1,5 +1,5 @@
-name: "Skill Validator"
-description: "Scan agent Skills for malicious behavior and fail CI on unsafe skills."
+name: "Vouch"
+description: "Vet agent Skills for malicious behavior and fail CI on ones you can't vouch for."
 branding:
   icon: "shield"
   color: "red"
@@ -30,9 +30,9 @@ runs:
       with:
         python-version: "3.12"
 
-    - name: Install skill-validator
+    - name: Install vouch
       shell: bash
-      run: python -m pip install --quiet "skill-validator @ git+https://github.com/OWNER/REPO@main" || python -m pip install --quiet skill-validator
+      run: python -m pip install --quiet "vouch @ git+https://github.com/OWNER/REPO@main" || python -m pip install --quiet vouch
 
     - name: Scan skills
       shell: bash
@@ -53,9 +53,9 @@ runs:
         for s in "${skills[@]}"; do
           echo "::group::Scanning $s"
           if [ "$SV_CV" = "true" ]; then
-            validate-skill "$s" --cv $llm_flag --no-color || true
+            vouch "$s" --cv $llm_flag --no-color || true
           fi
-          if ! validate-skill "$s" $llm_flag --no-color --fail-on "$SV_FAIL_ON"; then
+          if ! vouch "$s" $llm_flag --no-color --fail-on "$SV_FAIL_ON"; then
             echo "::error title=Unsafe skill::$s failed at fail-on=$SV_FAIL_ON"
             status=1
           fi

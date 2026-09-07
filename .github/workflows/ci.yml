@@ -34,10 +34,10 @@ jobs:
       - name: Install
         run: python -m pip install -e .
       - name: Benign example must pass
-        run: validate-skill ./examples/benign-skill --no-llm --no-color --fail-on suspicious
+        run: vouch ./examples/benign-skill --no-llm --no-color --fail-on suspicious
       - name: Malicious example must be caught
         run: |
-          if validate-skill ./examples/malicious-skill --no-llm --no-color --fail-on malicious; then
+          if vouch ./examples/malicious-skill --no-llm --no-color --fail-on malicious; then
             echo "Expected malicious verdict but scan passed"; exit 1
           else
             echo "Correctly flagged malicious example"

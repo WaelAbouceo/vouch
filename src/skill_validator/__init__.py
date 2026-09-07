@@ -1,35 +1,47 @@
-"""skill_validator: classify agent Skills as valid or malicious.
+"""Deprecated compatibility shim.
 
-Public API
-----------
-    from skill_validator import validate_skill, validate_path, validate_text
+``skill_validator`` was renamed to :mod:`vouch`. This module re-exports the new
+package so existing imports keep working::
 
-Each returns a :class:`~skill_validator.models.Report` with a ``verdict`` of
-``"valid"``, ``"suspicious"`` or ``"malicious"``.
+    from skill_validator import validate_path   # still works (deprecated)
+
+Please migrate to ``import vouch`` / ``from vouch import ...``.
 """
 
-from .agent import AgentCV, build_agent_cv, discover_skills
-from .cv import SkillCV, build_cv, render_markdown, render_text
-from .engine import Engine, validate_path, validate_skill, validate_text
-from .models import Finding, Report, Severity, SkillInput, Verdict
+from __future__ import annotations
 
-__all__ = [
-    "AgentCV",
-    "Engine",
-    "Finding",
-    "Report",
-    "Severity",
-    "SkillCV",
-    "SkillInput",
-    "Verdict",
-    "build_agent_cv",
-    "build_cv",
-    "discover_skills",
-    "render_markdown",
-    "render_text",
-    "validate_path",
-    "validate_skill",
-    "validate_text",
+import importlib
+import sys
+import warnings
+
+import vouch as _vouch
+from vouch import *  # noqa: F401,F403  (re-export public API)
+from vouch import __all__ as __all__  # noqa: PLC0414
+
+warnings.warn(
+    "`skill_validator` has been renamed to `vouch`; update your imports "
+    "(`import vouch`). The old name will be removed in a future release.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Make `import skill_validator.<sub>` resolve to the corresponding vouch module.
+_SUBMODULES = [
+    "agent",
+    "api",
+    "cli",
+    "cv",
+    "engine",
+    "llm",
+    "loader",
+    "mcp_server",
+    "models",
+    "rules",
 ]
+for _name in _SUBMODULES:
+    try:
+        sys.modules[f"{__name__}.{_name}"] = importlib.import_module(f"vouch.{_name}")
+    except Exception:  # pragma: no cover - optional deps (api/mcp) may be absent
+        pass
 
-__version__ = "0.2.0"
+__version__ = _vouch.__version__

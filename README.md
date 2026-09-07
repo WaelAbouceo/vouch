@@ -1,15 +1,18 @@
-# skill-validator
+# Vouch
 
 [![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/skill-validator.svg)](https://pypi.org/project/skill-validator/)
-[![Python](https://img.shields.io/pypi/pyversions/skill-validator.svg)](https://pypi.org/project/skill-validator/)
+[![PyPI](https://img.shields.io/pypi/v/vouch.svg)](https://pypi.org/project/vouch/)
+[![Python](https://img.shields.io/pypi/pyversions/vouch.svg)](https://pypi.org/project/vouch/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**A security & analysis toolkit for agent Skills.** Inspect any skill, understand
-what it can do, and decide whether it's safe to load.
+**The trust layer for AI agents.** Vet any Skill (or whole agent), understand
+what it can do, and vouch only for the ones that are safe to run.
 
-> _Think of it as the antivirus / linter for agent Skills — scan any skill
-> before your agent runs it._
+> _References for your agents — never run a skill you can't vouch for._
+
+> ℹ️ **Renamed:** this project was formerly `skill-validator`. The `vouch` CLI is
+> the primary command; `validate-skill` still works as a deprecated alias, and
+> `import skill_validator` still resolves to `vouch`.
 
 A "Skill" is a package of instructions (`SKILL.md`) plus optional scripts that an
 autonomous agent will read and may execute. Before an agent loads a skill, this
@@ -25,8 +28,8 @@ It offers three complementary capabilities:
 3. **Agent CV** — an aggregate trust profile across *all* of an agent's skills
    (see [Agent CV](#agent-cv--profile-a-whole-agent)).
 
-Both are available through **four surfaces**: a Python library, a CLI, an MCP
-server (for agents), and an HTTP API.
+All of these are available through **four surfaces**: a Python library, a CLI, an
+MCP server (for agents), and an HTTP API.
 
 - **Input:** a skill directory, a single file, or raw text.
 - **Output:** a verdict + risk score + findings, and/or a rendered Skill CV.
@@ -47,7 +50,7 @@ pip install -e ".[llm]"     # + Cursor SDK for the LLM auditor
 ### 1. Library / SDK
 
 ```python
-from skill_validator import validate_path, validate_text
+from vouch import validate_path, validate_text
 
 report = validate_path("./examples/malicious-skill", use_llm=False)
 print(report.verdict, report.risk_score)   # Verdict.MALICIOUS 100
@@ -61,12 +64,12 @@ print(report.to_json())
 ### 2. CLI
 
 ```bash
-validate-skill ./examples/benign-skill            # directory
-validate-skill ./SKILL.md                          # single file
-echo "rm -rf /" | validate-skill -                 # raw text via stdin
-validate-skill ./my-skill --json                   # machine-readable
-validate-skill ./my-skill --no-llm                 # static only
-validate-skill ./my-skill --fail-on suspicious     # CI gating
+vouch ./examples/benign-skill            # directory
+vouch ./SKILL.md                          # single file
+echo "rm -rf /" | vouch -                 # raw text via stdin
+vouch ./my-skill --json                   # machine-readable
+vouch ./my-skill --no-llm                 # static only
+vouch ./my-skill --fail-on suspicious     # CI gating
 ```
 
 Exit codes depend on `--fail-on` (default `malicious`):
@@ -79,7 +82,7 @@ Exit codes depend on `--fail-on` (default `malicious`):
 
 ```bash
 pip install -e ".[mcp]"
-skill-validator-mcp        # stdio transport
+vouch-mcp        # stdio transport
 ```
 
 Exposes two tools an agent can call:
@@ -90,7 +93,7 @@ Exposes two tools an agent can call:
 
 ```bash
 pip install -e ".[api]"
-skill-validator-api        # uvicorn on 0.0.0.0:8000
+vouch-api        # uvicorn on 0.0.0.0:8000
 ```
 
 ```bash
@@ -100,7 +103,7 @@ curl -sX POST localhost:8000/validate/text \
 ```
 
 Endpoints: `GET /health`, `POST /validate/text`, `POST /validate/path`
-(the latter is disabled unless `SKILL_VALIDATOR_ALLOW_PATH=1`).
+(the latter is disabled unless `VOUCH_ALLOW_PATH=1`).
 
 ## Skill CV (profile card)
 
@@ -109,13 +112,13 @@ frontmatter), the capabilities it requests, a file inventory, and the security
 verdict — all in one card.
 
 ```bash
-validate-skill ./my-skill --cv               # terminal card
-validate-skill ./my-skill --cv --markdown    # Markdown (great for reports/PRs)
-validate-skill ./my-skill --cv --json        # structured data
+vouch ./my-skill --cv               # terminal card
+vouch ./my-skill --cv --markdown    # Markdown (great for reports/PRs)
+vouch ./my-skill --cv --json        # structured data
 ```
 
 ```python
-from skill_validator import build_cv, render_markdown
+from vouch import build_cv, render_markdown
 
 cv = build_cv("./examples/malicious-skill", use_llm=False)
 print(cv.verdict, cv.recommendation)
@@ -137,13 +140,13 @@ verdict, agent-wide capabilities, per-skill breakdown). One malicious skill
 quarantines the whole agent.
 
 ```bash
-validate-skill ./my-agent-dir --agent-cv               # aggregate card
-validate-skill ./my-agent-dir --agent-cv --markdown    # table for reports
-validate-skill ./my-agent-dir --agent-cv --json        # structured data
+vouch ./my-agent-dir --agent-cv               # aggregate card
+vouch ./my-agent-dir --agent-cv --markdown    # table for reports
+vouch ./my-agent-dir --agent-cv --json        # structured data
 ```
 
 ```python
-from skill_validator import build_agent_cv
+from vouch import build_agent_cv
 
 agent = build_agent_cv("./examples/example-agent", use_llm=False)
 print(agent.verdict, agent.recommendation)   # Verdict.MALICIOUS  QUARANTINE ...
@@ -179,9 +182,9 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/OWNER/REPO
-    rev: v0.2.0
+    rev: v0.3.0
     hooks:
-      - id: skill-validator
+      - id: vouch
 ```
 
 ## Enabling the LLM auditor
@@ -190,8 +193,8 @@ The LLM layer is optional and degrades gracefully to static-only when absent.
 
 ```bash
 export CURSOR_API_KEY="cursor_..."
-export SKILL_VALIDATOR_MODEL="composer-2.5"   # optional override
-validate-skill ./my-skill --llm
+export VOUCH_MODEL="composer-2.5"   # optional override
+vouch ./my-skill --llm
 ```
 
 `use_llm` is auto-enabled when `CURSOR_API_KEY` is set; force it on/off with
@@ -199,7 +202,7 @@ validate-skill ./my-skill --llm
 
 ## How the verdict is computed
 
-1. Every file is scanned by the static rule set (`src/skill_validator/rules.py`),
+1. Every file is scanned by the static rule set (`src/vouch/rules.py`),
    producing severity-weighted findings.
 2. If enabled, an LLM auditor reviews the skill and contributes its own findings.
 3. Findings are aggregated into a 0–100 risk score (highest-severity findings
@@ -209,7 +212,7 @@ validate-skill ./my-skill --llm
 ## Project layout
 
 ```
-src/skill_validator/
+src/vouch/
   models.py       # Verdict, Severity, Finding, Report, SkillInput
   loader.py       # directory / file / raw-text loading
   rules.py        # static analysis rule set
@@ -217,7 +220,7 @@ src/skill_validator/
   engine.py       # hybrid scoring + public API (validate_path/text/skill)
   cv.py           # Skill CV: capability inference + profile renderers
   agent.py        # Agent CV: discover + aggregate all of an agent's skills
-  cli.py          # validate-skill (validation + --cv + --agent-cv)
+  cli.py          # vouch (validation + --cv + --agent-cv)
   mcp_server.py   # MCP tools for agents (validate_* + skill_cv)
   api.py          # FastAPI HTTP endpoints (/validate/* + /cv/text)
 examples/         # benign-skill/, malicious-skill/, example-agent/ fixtures

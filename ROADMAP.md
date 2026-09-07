@@ -7,7 +7,7 @@ Traction strategy: sharp positioning → zero-friction distribution → a
 data-driven "wow" moment → deep integrations → community & credibility.
 
 ## Phase 1 — Trivially adoptable  _(in progress)_
-- [ ] Publish to PyPI (`pip install skill-validator`, `pipx run skill-validator`)
+- [ ] Publish to PyPI (`pip install vouch`, `pipx run vouch`)
 - [x] GitHub Action to scan skills in CI (`action.yml`)
 - [x] pre-commit hook (`.pre-commit-hooks.yaml`)
 - [x] CI workflow (tests + self-scan on every push/PR)

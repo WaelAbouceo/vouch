@@ -2,11 +2,11 @@
 
 Run with::
 
-    skill-validator-mcp            # stdio transport (default)
+    vouch-mcp                      # stdio transport (default)
 
 Requires the ``mcp`` extra::
 
-    pip install "skill-validator[mcp]"
+    pip install "vouch[mcp]"
 
 Tools exposed
 -------------
@@ -33,10 +33,10 @@ def build_server():
     except Exception as e:  # pragma: no cover - import guard
         raise SystemExit(
             "The 'mcp' package is required. Install with: pip install "
-            '"skill-validator[mcp]"'
+            '"vouch[mcp]"'
         ) from e
 
-    mcp = FastMCP("skill-validator")
+    mcp = FastMCP("vouch")
 
     @mcp.tool()
     def validate_skill_text(

@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "skill-validator"
-version = "0.2.0"
-description = "Security & analysis toolkit for agent Skills: validate (valid/suspicious/malicious) and profile (Skill CV) via hybrid static + LLM analysis."
+name = "vouch"
+version = "0.3.0"
+description = "Vouch — the trust layer for AI agents. Vet Skills and agents, profile them with CVs, and vouch only for the safe ones (hybrid static + LLM analysis)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -17,6 +17,8 @@ keywords = [
   "static-analysis",
   "prompt-injection",
   "skill-cv",
+  "agent-cv",
+  "vouch",
   "mcp",
   "cursor-sdk",
 ]
@@ -38,9 +40,13 @@ all = [
 ]
 
 [project.scripts]
-validate-skill = "skill_validator.cli:main"
-skill-validator-api = "skill_validator.api:run"
-skill-validator-mcp = "skill_validator.mcp_server:main"
+vouch = "vouch.cli:main"
+vouch-api = "vouch.api:run"
+vouch-mcp = "vouch.mcp_server:main"
+# Back-compat aliases (deprecated):
+validate-skill = "vouch.cli:main"
+skill-validator-api = "vouch.api:run"
+skill-validator-mcp = "vouch.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

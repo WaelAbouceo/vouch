@@ -1,6 +1,6 @@
 """Agent CV: a trust profile for a whole agent (all of its skills).
 
-Where a :class:`~skill_validator.cv.SkillCV` profiles a single skill, an
+Where a :class:`~vouch.cv.SkillCV` profiles a single skill, an
 :class:`AgentCV` aggregates *every* skill an agent has loaded into one report:
 the overall verdict, the union of capabilities across skills, and a per-skill
 breakdown. Think of it as "would you hire this agent?".
