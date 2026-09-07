@@ -16,12 +16,14 @@ autonomous agent will read and may execute. Before an agent loads a skill, this
 toolkit audits it for prompt injection, data exfiltration, destructive commands,
 remote code execution, persistence, obfuscation, and privilege escalation.
 
-It offers two complementary capabilities:
+It offers three complementary capabilities:
 
 1. **Validation** — classify a skill as **valid**, **suspicious**, or
    **malicious**, with a 0–100 risk score and detailed findings.
 2. **Skill CV** — a one-page profile of a skill's identity, capabilities, file
    inventory, and security verdict (see [Skill CV](#skill-cv-profile-card)).
+3. **Agent CV** — an aggregate trust profile across *all* of an agent's skills
+   (see [Agent CV](#agent-cv--profile-a-whole-agent)).
 
 Both are available through **four surfaces**: a Python library, a CLI, an MCP
 server (for agents), and an HTTP API.
@@ -67,7 +69,11 @@ validate-skill ./my-skill --no-llm                 # static only
 validate-skill ./my-skill --fail-on suspicious     # CI gating
 ```
 
-Exit codes: `0` valid, `1` suspicious, `2` malicious (see `--fail-on`).
+Exit codes depend on `--fail-on` (default `malicious`):
+
+- **default (`--fail-on malicious`):** `2` if malicious, else `0`.
+- **`--fail-on suspicious`:** `0` valid, `1` suspicious, `2` malicious.
+- **`--fail-on never`:** always `0`.
 
 ### 3. MCP server (for agents)
 
@@ -210,10 +216,11 @@ src/skill_validator/
   llm.py          # optional Cursor SDK auditor
   engine.py       # hybrid scoring + public API (validate_path/text/skill)
   cv.py           # Skill CV: capability inference + profile renderers
-  cli.py          # validate-skill (validation + --cv)
+  agent.py        # Agent CV: discover + aggregate all of an agent's skills
+  cli.py          # validate-skill (validation + --cv + --agent-cv)
   mcp_server.py   # MCP tools for agents (validate_* + skill_cv)
   api.py          # FastAPI HTTP endpoints (/validate/* + /cv/text)
-examples/         # benign-skill/ and malicious-skill/ fixtures
+examples/         # benign-skill/, malicious-skill/, example-agent/ fixtures
 tests/            # pytest suite
 ```
 
