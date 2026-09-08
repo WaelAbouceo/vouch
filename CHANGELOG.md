@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-08
+
 ### Fixed
 - **GitHub Action install** — `action.yml` installed a non-existent `vouch`
   package (the distribution is `vouch-agent`); it now installs `vouch-agent`
