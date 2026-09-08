@@ -62,6 +62,18 @@ QUERIES = [
 ]
 
 
+def headline_finding(rep) -> str:
+    """The finding that best explains the verdict: the most severe *threat*
+    (what actually drove suspicious/malicious), not merely the first finding —
+    which is often a low-priority awareness notice like a curl|sh install line.
+    Falls back to the top notice only when there are no threats."""
+    pool = rep.threats or rep.findings
+    if not pool:
+        return ""
+    top = max(pool, key=lambda f: f.severity.weight)
+    return f"{top.rule_id}: {top.title}"
+
+
 def scan_md(text: str, name: str):
     """Validate SKILL.md text as a *markdown file* (source='file'), so the
     prose-vs-code evidence grading applies — matching how the tool treats a real
@@ -184,10 +196,7 @@ def scan_all(candidates: list[dict]) -> list[dict]:
                 "review_required": rep.review_required,
                 "capabilities": rep.capabilities,
                 "rules": sorted({f.rule_id for f in rep.findings}),
-                "top_finding": (
-                    f"{rep.findings[0].rule_id}: {rep.findings[0].title}"
-                    if rep.findings else ""
-                ),
+                "top_finding": headline_finding(rep),
             }
         )
         if (i + 1) % 25 == 0 or i + 1 == total:
@@ -272,9 +281,7 @@ def main() -> int:
                 "review_required": rep.review_required,
                 "capabilities": rep.capabilities,
                 "rules": sorted({f.rule_id for f in rep.findings}),
-                "top_finding": (f"{rep.findings[0].rule_id}: "
-                                f"{rep.findings[0].title}"
-                                if rep.findings else ""),
+                "top_finding": headline_finding(rep),
             })
     else:
         print("Discovering public SKILL.md files ...")
