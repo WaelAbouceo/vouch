@@ -37,7 +37,8 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from vouch import validate_text
+from vouch import validate_skill
+from vouch.models import SkillFile, SkillInput
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -59,6 +60,19 @@ QUERIES = [
     # capability-ish terms (surface higher-signal skills too)
     "curl", "token", "secret", "env", "shell", "network", "credentials",
 ]
+
+
+def scan_md(text: str, name: str):
+    """Validate SKILL.md text as a *markdown file* (source='file'), so the
+    prose-vs-code evidence grading applies — matching how the tool treats a real
+    skill on disk. Using validate_text() here would force every capability to
+    'strong' and inflate the capability-gate rate."""
+    skill = SkillInput(
+        name=name,
+        files=[SkillFile(path="SKILL.md", content=text)],
+        source="file",
+    )
+    return validate_skill(skill, use_llm=False)
 
 
 def sh(args: list[str]) -> str:
@@ -160,7 +174,7 @@ def scan_all(candidates: list[dict]) -> list[dict]:
         text = fetch(c["repo"], c["path"])
         if not text or not text.strip():
             continue
-        rep = validate_text(text, name=c["repo"], use_llm=False)
+        rep = scan_md(text, name=c["repo"])
         records.append(
             {
                 "repo": c["repo"],
@@ -251,7 +265,7 @@ def main() -> int:
             text = cp.read_text(encoding="utf-8", errors="replace")
             if not text.strip():
                 continue
-            rep = validate_text(text, name=cp.name, use_llm=False)
+            rep = scan_md(text, name=cp.name)
             records.append({
                 "repo": cp.name, "path": "SKILL.md",
                 "verdict": rep.verdict.value, "risk_score": rep.risk_score,
