@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Packaging for PyPI under the distribution name `vouch-agent` (the import
+  package and CLI remain `vouch`). Automated publish via GitHub Actions using
+  PyPI Trusted Publishing (OIDC) — see `.github/workflows/release.yml`.
+- PyPI classifiers and project URLs.
+
 ## [0.3.0] - 2026-09-08
 
 ### Added

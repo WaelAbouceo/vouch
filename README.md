@@ -37,6 +37,17 @@ MCP server (for agents), and an HTTP API.
 
 ## Install
 
+From PyPI (the command is `vouch`; the distribution is `vouch-agent`):
+
+```bash
+pip install vouch-agent           # core (static analysis only, zero deps)
+pip install "vouch-agent[all]"    # + FastAPI HTTP API, MCP server, dev tools
+pip install "vouch-agent[llm]"    # + Cursor SDK for the LLM auditor
+pipx run --spec vouch-agent vouch --help   # zero-install, one-off run
+```
+
+Or from source, for development:
+
 ```bash
 pip install -e .            # core (static analysis only, zero deps)
 pip install -e ".[all]"     # + FastAPI HTTP API, MCP server, dev tools

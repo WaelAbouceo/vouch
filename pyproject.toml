@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vouch"
+name = "vouch-agent"
 version = "0.3.0"
 description = "Vouch — the trust layer for AI agents. Vet Skills and agents, profile them with CVs, and vouch only for the safe ones (hybrid static + LLM analysis)."
 readme = "README.md"
@@ -22,6 +22,19 @@ keywords = [
   "mcp",
   "cursor-sdk",
 ]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security",
+  "Topic :: Software Development :: Quality Assurance",
+  "Typing :: Typed",
+]
 
 dependencies = []
 
@@ -38,6 +51,12 @@ all = [
   "pytest>=8",
   "ruff>=0.5",
 ]
+
+[project.urls]
+Homepage = "https://github.com/WaelAbouceo/vouch"
+Repository = "https://github.com/WaelAbouceo/vouch"
+Changelog = "https://github.com/WaelAbouceo/vouch/blob/main/CHANGELOG.md"
+Issues = "https://github.com/WaelAbouceo/vouch/issues"
 
 [project.scripts]
 vouch = "vouch.cli:main"
