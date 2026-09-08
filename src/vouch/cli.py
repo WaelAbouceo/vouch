@@ -14,11 +14,21 @@ Examples
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from . import loader
 from .engine import validate_skill
 from .models import Report, Severity, Verdict
+
+# Env vars that indicate an LLM backend is configured (for the --audit hint).
+_LLM_KEY_ENVS_HINT = (
+    "SEG_API_KEY",
+    "SOVEREIGNEG_API_KEY",
+    "CURSOR_API_KEY",
+    "OPENAI_API_KEY",
+    "VOUCH_LLM_API_KEY",
+)
 
 _EXIT = {Verdict.VALID: 0, Verdict.SUSPICIOUS: 1, Verdict.MALICIOUS: 2}
 
@@ -147,6 +157,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--model", default=None, help="Override the LLM model id.")
     p.add_argument(
+        "--provider",
+        choices=["auto", "seg", "cursor", "openai"],
+        default=None,
+        help="LLM backend to use (default: auto-detect). 'seg' = SovereignEG "
+        "(set SEG_API_KEY); 'openai' works with any OpenAI-compatible endpoint "
+        "via OPENAI_BASE_URL.",
+    )
+    p.add_argument(
         "--no-color", action="store_true", help="Disable ANSI colors in text output."
     )
     p.add_argument(
@@ -167,6 +185,11 @@ def main(argv: list[str] | None = None) -> int:
     elif args.llm:
         use_llm = True
 
+    # Provider selection is read from the environment by the LLM layer, so
+    # setting it here applies uniformly across validate / CV / audit paths.
+    if args.provider:
+        os.environ["VOUCH_LLM_PROVIDER"] = args.provider
+
     color = sys.stdout.isatty() and not args.no_color
 
     # Machine audit: discover and classify every skill on this computer.
@@ -176,11 +199,28 @@ def main(argv: list[str] | None = None) -> int:
         roots = None
         if args.target and args.target != "-":
             roots = [args.target]
+
+        # A machine audit can span dozens of skills, so we do NOT auto-fire the
+        # LLM just because a key is configured — that would silently make N slow
+        # network calls. The LLM runs only when explicitly requested with --llm.
+        audit_use_llm = bool(args.llm)
+
+        progress = None
+        if audit_use_llm:
+            def progress(i: int, total: int, name: str) -> None:
+                print(
+                    f"\r  auditing {i}/{total}: {name[:38]:38}",
+                    end="", file=sys.stderr, flush=True,
+                )
+                if i == total:
+                    print("\r" + " " * 60 + "\r", end="", file=sys.stderr, flush=True)
+
         machine = audit_mod.audit_machine(
             roots,
-            use_llm=use_llm,
+            use_llm=audit_use_llm,
             model=args.model,
             human_signoff=args.sign_off,
+            progress=progress,
         )
 
         # Baseline diff: "what changed since last audit".
@@ -217,6 +257,15 @@ def main(argv: list[str] | None = None) -> int:
                     audit_mod.render_diff_text(
                         diff or audit_mod.AuditDiff(), color=color, first_run=first_run
                     )
+                )
+            # Nudge toward the deeper (LLM) pass when it's available but unused.
+            if not audit_use_llm and any(
+                os.environ.get(k) for k in _LLM_KEY_ENVS_HINT
+            ):
+                print(
+                    "\nTip: add --llm to also run the AI auditor "
+                    "(clears false 'review' flags, catches evasive threats).",
+                    file=sys.stderr,
                 )
 
         # Update the baseline for next time.

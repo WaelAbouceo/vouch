@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -154,42 +155,55 @@ def audit_machine(
     model: str | None = None,
     api_key: str | None = None,
     human_signoff: bool = False,
+    progress: Callable[[int, int, str], None] | None = None,
 ) -> MachineAudit:
-    """Discover and classify every skill under ``roots`` (or the machine's)."""
+    """Discover and classify every skill under ``roots`` (or the machine's).
+
+    ``progress`` is called as ``progress(index, total, name)`` before each skill
+    is classified — useful for a status line during slow (LLM-enabled) runs.
+    """
     root_paths = (
         [Path(os.path.expanduser(r)) for r in roots]
         if roots
         else known_skill_roots()
     )
 
-    entries: list[AuditEntry] = []
+    # Gather every skill first so we know the total up front (for progress).
+    targets: list[tuple[Path, Path]] = []
     for rp in root_paths:
         if not rp.is_dir():
             continue
         for sd in discover_skills(rp):
-            skill = loader.load(str(sd))
-            cv = build_cv(
-                skill,
-                use_llm=use_llm,
-                model=model,
-                api_key=api_key,
-                human_signoff=human_signoff,
+            targets.append((rp, sd))
+
+    entries: list[AuditEntry] = []
+    total = len(targets)
+    for i, (rp, sd) in enumerate(targets, start=1):
+        if progress is not None:
+            progress(i, total, sd.name)
+        skill = loader.load(str(sd))
+        cv = build_cv(
+            skill,
+            use_llm=use_llm,
+            model=model,
+            api_key=api_key,
+            human_signoff=human_signoff,
+        )
+        impls = plain_english_implications(cv.capabilities)
+        headline = impls[0][1] if impls else ""
+        entries.append(
+            AuditEntry(
+                root=str(rp),
+                name=cv.name,
+                path=str(sd),
+                verdict=cv.verdict,
+                risk_score=cv.risk_score,
+                review_required=cv.report.review_required,
+                roles=[r.name for r in infer_roles(cv.capabilities)],
+                headline=headline,
+                fingerprint=_fingerprint(skill),
             )
-            impls = plain_english_implications(cv.capabilities)
-            headline = impls[0][1] if impls else ""
-            entries.append(
-                AuditEntry(
-                    root=str(rp),
-                    name=cv.name,
-                    path=str(sd),
-                    verdict=cv.verdict,
-                    risk_score=cv.risk_score,
-                    review_required=cv.report.review_required,
-                    roles=[r.name for r in infer_roles(cv.capabilities)],
-                    headline=headline,
-                    fingerprint=_fingerprint(skill),
-                )
-            )
+        )
 
     entries.sort(
         key=lambda e: (_VERDICT_RANK[e.verdict], e.risk_score), reverse=True
