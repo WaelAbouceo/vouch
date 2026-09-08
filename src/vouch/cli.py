@@ -93,7 +93,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "target",
-        help="Path to a skill directory or file, or '-' to read raw text from stdin.",
+        nargs="?",
+        default=None,
+        help="Path to a skill directory or file, or '-' to read raw text from stdin. "
+        "Optional with --audit (defaults to all skill locations on this machine).",
+    )
+    p.add_argument(
+        "--audit",
+        action="store_true",
+        help="Audit every skill installed on this machine (or under the given "
+        "path/paths): classify what each one does and flag the risky ones.",
     )
     p.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
     p.add_argument(
@@ -148,12 +157,40 @@ def main(argv: list[str] | None = None) -> int:
 
     color = sys.stdout.isatty() and not args.no_color
 
+    # Machine audit: discover and classify every skill on this computer.
+    if args.audit:
+        from . import audit as audit_mod
+
+        roots = None
+        if args.target and args.target != "-":
+            roots = [args.target]
+        machine = audit_mod.audit_machine(
+            roots,
+            use_llm=use_llm,
+            model=args.model,
+            human_signoff=args.sign_off,
+        )
+        if args.json:
+            import json as _json
+
+            print(_json.dumps(machine.to_dict(), indent=2))
+        elif args.markdown:
+            print(audit_mod.render_markdown(machine))
+        else:
+            print(audit_mod.render_text(machine, color=color))
+        worst = audit_mod._worst(machine)
+        if args.fail_on == "never":
+            return 0
+        if args.fail_on == "suspicious":
+            return 0 if worst == Verdict.VALID else _EXIT[worst]
+        return 2 if worst == Verdict.MALICIOUS else 0
+
     # Agent CV: aggregate every skill under the target directory.
     if args.agent_cv:
         from . import agent as agent_mod
 
-        if args.target == "-":
-            print("error: --agent-cv requires a directory, not stdin.", file=sys.stderr)
+        if args.target is None or args.target == "-":
+            print("error: --agent-cv requires a directory path.", file=sys.stderr)
             return 3
         agent_cv = agent_mod.build_agent_cv(
             args.target,
@@ -176,6 +213,12 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if verdict == Verdict.VALID else _EXIT[verdict]
         return 2 if verdict == Verdict.MALICIOUS else 0
 
+    if args.target is None:
+        print(
+            "error: a target is required (or use --audit to scan this machine).",
+            file=sys.stderr,
+        )
+        return 3
     if args.target == "-":
         skill = loader.load_text(sys.stdin.read(), name="stdin-skill")
     else:
