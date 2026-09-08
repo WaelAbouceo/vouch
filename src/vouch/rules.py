@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from .models import Finding, Severity, SkillFile, SkillInput
 

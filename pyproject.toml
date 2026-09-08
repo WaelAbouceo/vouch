@@ -53,3 +53,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+# Pin an explicit rule set so linting is deterministic across ruff versions.
+select = ["E", "F", "I", "W", "UP"]
