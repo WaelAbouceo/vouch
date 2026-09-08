@@ -6,6 +6,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-08
+
+### Added
+- **Labeled benchmark** (`bench/` + `scripts/benchmark.py`) — 22 ground-truth
+  skills (11 benign incl. powerful-but-legit and a defensive tool; 11 malicious
+  incl. obfuscated, staged-dropper, and auditor-injection cases). Reports
+  precision/recall for "flagged for review" and "classified malicious", and
+  lists misses/false-alarms. Supports `--llm` for the hybrid comparison. This
+  replaces "trust us" with measured numbers.
+- `RCE005` — detects the dropper pattern (marking a `/tmp` file executable or
+  running one directly), catching download-then-execute chains static missed.
+- **Provider-agnostic LLM auditor** — the LLM layer now supports any
+  OpenAI-compatible endpoint (OpenAI, OpenRouter, Together, local Ollama via
+  `OPENAI_BASE_URL`) in addition to the Cursor SDK. Auto-detects across
+  `CURSOR_API_KEY` / `OPENAI_API_KEY` / `VOUCH_LLM_API_KEY`; choose a backend
+  with `--provider` (CLI) or `VOUCH_LLM_PROVIDER`. A `responder` injection hook
+  makes the hybrid pipeline fully testable offline.
+- **SovereignEG backend** — first-class support for [SovereignEG](https://sovereigneg.com),
+  an OpenAI-compatible, Egypt-hosted inference platform. Set `SEG_API_KEY` and use
+  `--provider seg`; calls the OpenAI-compatible `/v1` endpoint (default base
+  `https://sovereigneg.com`, model `gpt-4o-mini`, both overridable via
+  `SEG_BASE_URL` / `SEG_MODEL`), with the `sovereigneg` SDK as a fallback. Takes
+  priority in auto-detect. **Verified live**: on SovereignEG (`gpt-4o-mini`) the
+  hybrid engine reaches **100% flag-for-review recall** (no dangerous skill left
+  as a clean "valid") while "malicious" stays deterministic (100% precision).
+- **Machine-wide audit** (`vouch --audit`) — auto-discovers every skill
+  installed for Claude, Cursor, Codex, and friends, classifies each, names what
+  it behaves like (roles), and reports which need a look. Saves a baseline and,
+  on later runs, shows **what changed since last audit** (new / removed / newly
+  risky skills). `--json` for dashboards; pass a path to scan a single folder.
+- **Evidence-graded capabilities + plain-English profiles** — capabilities are
+  inferred from *executable* context (fenced code / scripts, not prose), each
+  skill gets a plain-English "what this means for you" and a role (Data Courier,
+  Remote Code Runner, File Editor, Advisor, …).
+
+### Changed
+- **`--audit` UX** — the LLM is now opt-in for audits (`--llm`, not
+  auto-enabled), a progress indicator prints during LLM runs, and a hint appears
+  when an LLM key is configured but `--llm` wasn't used, so `vouch --audit` never
+  looks like it hung.
+- **README reframed value-first** — leads with `vouch --audit` (the flagship),
+  demotes secondary surfaces (HTTP API, MCP) and multi-provider LLM setup into
+  collapsible sections.
+- **Context-graded threats** — command/execution rules (`RCE003-005`, `DES*`,
+  `EXF001/005/007`, `OBF003`, `NET001`) now only count as *threats* when they
+  appear in executable context (a fenced code block or a script). The same
+  string quoted in prose — e.g. a security tool listing an attack as a detection
+  pattern — is downgraded to an awareness notice. Prompt-injection rules (`INJ*`)
+  are exempt and always count, since they are attacks precisely as prose. This
+  removes the defensive-tool false positive: static now scores **100% precision
+  / 0 false "malicious"** on the benchmark.
+- **LLM is advisory, not authoritative** — the LLM auditor can raise a skill to
+  **"suspicious / review"** (catching evasive threats static misses) but can
+  **never brand a skill "malicious" on its own**. LLM verdicts are
+  non-deterministic (we observed the same real skill flip between valid /
+  suspicious / malicious across identical runs), so the strongest verdict is
+  reserved for deterministic static detections — keeping "malicious"
+  reproducible and false-accusation-free. LLM findings are excluded from the
+  risk score; capability combinations drive the review **gate**, not the score,
+  and a clean LLM pass or human sign-off lifts the gate.
+- `EXF007` raised to **critical** — piping environment/secret files straight
+  into a network sender is unambiguous exfiltration (improves benchmark
+  malicious-recall from 55% → 64%).
+
 ## [0.4.0] - 2026-09-08
 
 ### Added

