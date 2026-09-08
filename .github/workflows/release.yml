@@ -53,3 +53,7 @@ jobs:
           path: dist/
       - name: Publish
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A tag push and a GitHub Release can both fire this workflow for the
+          # same version; don't fail the second run on an already-uploaded file.
+          skip-existing: true
