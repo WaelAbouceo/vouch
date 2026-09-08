@@ -27,7 +27,7 @@ _EXEC_CONTEXT_RULES = frozenset({
     "RCE003", "RCE004", "RCE005",
     "DES001", "DES002", "DES003",
     "EXF001", "EXF005", "EXF007",
-    "OBF003",
+    "OBF003", "OBF005",
     "NET001",
 })
 
@@ -248,6 +248,20 @@ RULES: list[Rule] = [
         Severity.CRITICAL,
         _rx(r"base64\s+(-d|--decode)\b[^\n|]*\|\s*(ba|z|)sh\b"),
         "Decodes a base64 payload and pipes it straight to a shell.",
+    ),
+    Rule(
+        "OBF005",
+        "Command assembled from variable fragments",
+        Severity.HIGH,
+        # Two or more shell variable expansions concatenated with no separator
+        # ($A$B, ${A}${B}) at a *command position* (line start, or after ; & |
+        # ` or $( ). This is the classic trick for hiding a command such as
+        # `rm -rf` from a scanner by splitting it across variables. Requiring a
+        # command-position prefix avoids matching ordinary string concatenation
+        # like path="$dir$file" or echo "$a$b".
+        _rx(r"(?:^|[\n;&|`]|\$\()[ \t]*(?:\$\{?\w+\}?){2,}"),
+        "Builds a command by gluing shell variables together (e.g. $A$B) — a "
+        "well-known way to hide a dangerous command like `rm -rf` from scanners.",
     ),
     # --- Prompt injection targeting the reading agent --------------------
     Rule(

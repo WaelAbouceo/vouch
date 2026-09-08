@@ -4,11 +4,22 @@ These never call a real model. They use the ``responder`` injection hook and
 monkeypatching so the hybrid pipeline is fully exercised offline.
 """
 
+import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 from vouch import llm, loader, validate_skill, validate_text
 from vouch.models import Verdict
+
+# Some tests exercise the OpenAI-compatible detection path, which requires the
+# optional ``openai`` package. Skip them cleanly when it isn't installed so a
+# fresh clone (which installs only the base + [dev] deps) still runs green.
+_HAS_OPENAI = importlib.util.find_spec("openai") is not None
+requires_openai = pytest.mark.skipif(
+    not _HAS_OPENAI, reason="optional 'openai' package not installed"
+)
 
 BENCH = Path(__file__).resolve().parents[1] / "bench"
 
@@ -123,14 +134,18 @@ def test_llm_lifts_capability_gate_when_clean(monkeypatch):
     assert hybrid.review_required is False
 
 
-def test_hybrid_flags_obfuscated_rm_for_review(monkeypatch):
-    # The known static miss: variable-assembled `rm -rf`. Static returns valid;
-    # the LLM catches it and the hybrid result becomes SUSPICIOUS (flagged for
-    # review) — not malicious, since that verdict is reserved for deterministic
-    # detections.
+def test_static_flags_obfuscated_rm_for_review(monkeypatch):
+    # Previously a static miss (variable-assembled `rm -rf`). OBF005 now catches
+    # the obfuscation deterministically -> SUSPICIOUS (flagged for review). It is
+    # not "malicious": that verdict is reserved for unambiguous detections, and a
+    # scanner cannot prove the assembled string is destructive without running it.
     skill = loader.load(str(BENCH / "malicious" / "obfuscated-rm"))
-    assert validate_skill(skill, use_llm=False).verdict == Verdict.VALID
+    static = validate_skill(skill, use_llm=False)
+    assert static.verdict == Verdict.SUSPICIOUS
+    assert "OBF005" in {f.rule_id for f in static.findings}
 
+    # The LLM layer, if it also flags it, keeps the verdict at review — it never
+    # escalates to malicious on its own.
     def fake(s, **kw):
         return llm.LLMResult(
             "malicious", 0.9, "assembles rm -rf from variables", [], provider="custom"
@@ -155,6 +170,7 @@ def test_available_provider_none_when_unconfigured(monkeypatch):
     assert llm.is_available() is False
 
 
+@requires_openai
 def test_available_provider_prefers_explicit_choice(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("VOUCH_LLM_PROVIDER", "openai")
@@ -172,6 +188,7 @@ def _clear_llm_env(monkeypatch):
         monkeypatch.delenv(k, raising=False)
 
 
+@requires_openai
 def test_seg_detected_when_key_set(monkeypatch):
     _clear_llm_env(monkeypatch)
     monkeypatch.setenv("VOUCH_LLM_PROVIDER", "auto")
@@ -181,6 +198,7 @@ def test_seg_detected_when_key_set(monkeypatch):
     assert llm.is_available() is True
 
 
+@requires_openai
 def test_seg_takes_priority_over_openai(monkeypatch):
     _clear_llm_env(monkeypatch)
     monkeypatch.setenv("VOUCH_LLM_PROVIDER", "auto")
