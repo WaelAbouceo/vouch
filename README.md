@@ -1,7 +1,8 @@
 # Vouch
 
 [![CI](https://github.com/WaelAbouceo/vouch/actions/workflows/ci.yml/badge.svg)](https://github.com/WaelAbouceo/vouch/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![PyPI](https://img.shields.io/pypi/v/vouch-agent.svg)](https://pypi.org/project/vouch-agent/)
+[![Python](https://img.shields.io/pypi/pyversions/vouch-agent.svg)](https://pypi.org/project/vouch-agent/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 
