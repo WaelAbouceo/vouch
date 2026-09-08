@@ -53,6 +53,17 @@ def test_agent_cv_serializable():
     json.loads(json.dumps(cv.to_dict()))
 
 
+def test_agent_cv_groups_skills_by_role():
+    cv = build_agent_cv(str(AGENT), use_llm=False)
+    # roles are aggregated across skills and surfaced in the render
+    assert cv.roles
+    assert all(count >= 1 for count in cv.roles.values())
+    md = render_markdown(cv)
+    assert "What this agent behaves as" in md
+    txt = render_text(cv, color=False)
+    assert "BEHAVES AS" in txt
+
+
 def test_toplevel_renderers_dispatch_on_cv_type():
     """The package-level render_text/render_markdown must handle BOTH
     SkillCV and AgentCV (regression: they previously only handled SkillCV)."""

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from . import loader
+from .capabilities import infer_roles
 from .cv import SkillCV, build_cv
 from .models import Severity, Verdict
 
@@ -54,6 +55,7 @@ class SkillSummary:
     risk_score: int
     finding_count: int
     top_capabilities: list[str] = field(default_factory=list)
+    roles: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,6 +65,7 @@ class SkillSummary:
             "risk_score": self.risk_score,
             "finding_count": self.finding_count,
             "top_capabilities": self.top_capabilities,
+            "roles": self.roles,
         }
 
 
@@ -76,6 +79,7 @@ class AgentCV:
     skills: list[SkillSummary]
     capabilities: dict[str, int]  # capability label -> how many skills use it
     findings_by_severity: dict[str, int]
+    roles: dict[str, int] = field(default_factory=dict)  # role name -> skill count
     skill_cvs: list[SkillCV] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -85,6 +89,7 @@ class AgentCV:
             "risk_score": self.risk_score,
             "recommendation": self.recommendation,
             "skill_count": self.skill_count,
+            "roles": self.roles,
             "capabilities": self.capabilities,
             "findings_by_severity": self.findings_by_severity,
             "skills": [s.to_dict() for s in self.skills],
@@ -126,6 +131,7 @@ def build_agent_cv(
     worst = Verdict.VALID
     max_risk = 0
     cap_counts: dict[str, int] = {}
+    role_counts: dict[str, int] = {}
     sev_totals: dict[str, int] = {s.value: 0 for s in Severity}
     summaries: list[SkillSummary] = []
 
@@ -136,6 +142,9 @@ def build_agent_cv(
         present = [c.label for c in cv.capabilities if c.present]
         for label in present:
             cap_counts[label] = cap_counts.get(label, 0) + 1
+        roles = [r.name for r in infer_roles(cv.capabilities)]
+        for rname in roles:
+            role_counts[rname] = role_counts.get(rname, 0) + 1
         for sev, n in cv.findings_by_severity.items():
             sev_totals[sev] += n
         summaries.append(
@@ -146,6 +155,7 @@ def build_agent_cv(
                 risk_score=cv.risk_score,
                 finding_count=len(cv.report.findings),
                 top_capabilities=present[:4],
+                roles=roles,
             )
         )
 
@@ -162,6 +172,7 @@ def build_agent_cv(
         skills=summaries,
         capabilities=dict(sorted(cap_counts.items(), key=lambda kv: -kv[1])),
         findings_by_severity=sev_totals,
+        roles=dict(sorted(role_counts.items(), key=lambda kv: -kv[1])),
         skill_cvs=skill_cvs,
     )
 
@@ -188,6 +199,14 @@ def render_markdown(cv: AgentCV) -> str:
     )
     lines.append("")
     lines.append(f"**Recommendation:** {cv.recommendation}")
+    lines.append("")
+
+    lines.append("## What this agent behaves as")
+    if not cv.roles:
+        lines.append("_No skills profiled._")
+    else:
+        for name, count in cv.roles.items():
+            lines.append(f"- **{name}** — {count} skill(s)")
     lines.append("")
 
     lines.append("## Skills")
@@ -249,12 +268,21 @@ def render_text(cv: AgentCV, color: bool = False) -> str:
     lines.append(c(f"Recommendation: {cv.recommendation}", _C[cv.verdict]))
     lines.append("")
 
+    lines.append(c("BEHAVES AS", _BOLD))
+    if not cv.roles:
+        lines.append("  (no skills profiled)")
+    for name, count in cv.roles.items():
+        lines.append(f"  • {name} — {count} skill(s)")
+    lines.append("")
+
     lines.append(c("SKILLS", _BOLD))
     for s in cv.skills:
         mark = c(s.verdict.value.upper().ljust(10), _C[s.verdict])
         lines.append(
             f"  {mark} risk {s.risk_score:>3}  {s.finding_count:>2} finding(s)  {s.name}"
         )
+        if s.roles:
+            lines.append(f"             role: {', '.join(s.roles)}")
         if s.top_capabilities:
             lines.append(f"             caps: {', '.join(s.top_capabilities)}")
     lines.append("")

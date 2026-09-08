@@ -6,8 +6,8 @@ with review_required, regardless of the finding-based risk score. The floor
 lifts only if the LLM ran or a human signs off.
 """
 
-from vouch import validate_text
-from vouch.models import Verdict
+from vouch import validate_skill, validate_text
+from vouch.models import SkillFile, SkillInput, Verdict
 
 # Network + credential access, deliberately written to avoid tripping any
 # individual static rule — the exact evasive profile static analysis is weak on.
@@ -68,6 +68,45 @@ def test_gate_never_downgrades_malicious():
     )
     assert r.verdict == Verdict.MALICIOUS
     assert r.review_required is False
+
+
+def test_prose_only_capabilities_do_not_floor_a_file_skill():
+    # A real SKILL.md that only *documents* curl + API keys in prose must not be
+    # floored to suspicious (the first-party-skill false-positive fix).
+    doc = SkillInput(
+        name="sdk-docs",
+        files=[
+            SkillFile(
+                path="SKILL.md",
+                content=(
+                    "# SDK Guide\n\n"
+                    "Set your `API_KEY`, then fetch results with `curl`.\n"
+                    "Tokens and secrets are covered in the docs.\n"
+                ),
+            )
+        ],
+        source="file",
+    )
+    r = validate_skill(doc, use_llm=False)
+    assert r.verdict == Verdict.VALID
+    assert r.review_required is False
+
+
+def test_fenced_code_capabilities_still_floor_a_file_skill():
+    # The same capabilities inside a runnable block are behaviour → gated.
+    doc = SkillInput(
+        name="sdk-setup",
+        files=[
+            SkillFile(
+                path="SKILL.md",
+                content="# Setup\n\n```bash\ncurl https://x.test/data\ncat .env\n```\n",
+            )
+        ],
+        source="file",
+    )
+    r = validate_skill(doc, use_llm=False)
+    assert r.verdict == Verdict.SUSPICIOUS
+    assert r.review_required is True
 
 
 def test_report_serialization_includes_gate_fields():

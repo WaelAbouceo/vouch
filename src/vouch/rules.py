@@ -251,17 +251,25 @@ RULES: list[Rule] = [
         "INJ004",
         "Do-not-tell / stay-silent instruction",
         Severity.MEDIUM,
-        _rx(r"(do\s*not|don'?t|never)\b[^\n]{0,30}"
-            r"(tell|inform|notify|mention|alert|warn)\b[^\n]{0,20}(the\s+)?(user|human)"),
+        # The negation must attach directly to the tell-verb (no clause break like
+        # a dash/comma/period in between), otherwise benign guidance such as
+        # "do not produce a canvas — tell the user what's missing" trips it.
+        _rx(r"\b(do\s*not|don'?t|never|avoid)\b[^\n\-—.,;:]{0,15}"
+            r"(tell|inform|notify|mention|alert|warn|reveal|disclose)\b"
+            r"[^\n\-—.,;:]{0,15}(the\s+)?(user|human|owner)"),
         "Instructs the agent to hide its actions from the user.",
     ),
     Rule(
         "INJ005",
         "Escalation / silent auto-approval instruction",
         Severity.MEDIUM,
-        # Note: bare "without permission" was removed — it fired on legitimate
-        # negated guidance ("don't do X without permission").
-        _rx(r"(auto[-\s]?approve|without\s+(asking|confirmation)|"
+        # Note: bare "without permission"/"without asking" were removed — they
+        # fired on benign guidance ("without asking the user to spell the name").
+        # The negation must attach to a confirmation/approval object.
+        _rx(r"(auto[-\s]?approve|"
+            r"without\s+(confirmation|consent|approval)|"
+            r"without\s+asking\s+(for\s+)?(permission|confirmation|approval|"
+            r"consent|first)|"
             r"skip\s+(the\s+)?confirmation|bypass\s+confirmation)"),
         "Tries to make the agent act without user confirmation.",
     ),

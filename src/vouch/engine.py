@@ -17,7 +17,7 @@ import os
 from dataclasses import dataclass
 
 from . import loader
-from .capabilities import present_keys, scan_capabilities
+from .capabilities import active_keys, scan_capabilities
 from .models import Finding, Report, Severity, SkillInput, Verdict
 from .rules import run_rules
 
@@ -181,9 +181,11 @@ class Engine:
         engine_name = "static"
         summary_override = ""
 
-        # Capability composition analysis.
+        # Capability composition analysis. The gate keys off *executable*
+        # (strong) capabilities only — a skill that merely documents curl/keys
+        # in prose must not be floored to suspicious for it.
         caps = scan_capabilities(skill)
-        cap_keys = present_keys(caps)
+        cap_keys = active_keys(caps)
         cap_labels = [c.label for c in caps if c.present]
         combos = self._match_combos(cap_keys)
         for combo in combos:

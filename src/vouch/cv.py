@@ -19,7 +19,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from . import loader
-from .capabilities import Capability, Evidence, scan_capabilities
+from .capabilities import (
+    Capability,
+    Evidence,
+    infer_roles,
+    plain_english_implications,
+    scan_capabilities,
+)
 from .engine import validate_skill
 from .models import Report, Severity, SkillInput, Verdict
 
@@ -88,6 +94,14 @@ class SkillCV:
             "risk_score": self.risk_score,
             "summary": self.summary,
             "recommendation": self.recommendation,
+            "roles": [
+                {"name": r.name, "blurb": r.blurb, "level": r.level}
+                for r in infer_roles(self.capabilities)
+            ],
+            "what_this_means": [
+                {"level": level, "text": text}
+                for level, text in plain_english_implications(self.capabilities)
+            ],
             "capabilities": [c.to_dict() for c in self.capabilities if c.present],
             "files": [{"path": p, "lines": n} for p, n in self.files],
             "findings_by_severity": self.findings_by_severity,
@@ -167,12 +181,22 @@ def render_markdown(cv: SkillCV) -> str:
     lines.append("")
     lines.append(f"> {cv.description}")
     lines.append("")
+    roles = infer_roles(cv.capabilities)
+    lines.append("**Profile:** " + " · ".join(r.name for r in roles))
+    lines.append("")
     lines.append(f"**Verdict:** {_VERDICT_BADGE[cv.verdict]}  ·  "
                  f"**Risk score:** {cv.risk_score}/100  ·  "
                  f"**Source:** {cv.source}  ·  "
                  f"**Engine:** {cv.report.engine}")
     lines.append("")
     lines.append(f"**Recommendation:** {cv.recommendation}")
+    lines.append("")
+
+    # What this means for you (plain English)
+    _MD_ICON = {"danger": "🚨", "caution": "⚠️", "info": "ℹ️"}
+    lines.append("## What this means for you")
+    for level, text in plain_english_implications(cv.capabilities):
+        lines.append(f"- {_MD_ICON[level]} {text}")
     lines.append("")
 
     # Capabilities
@@ -244,6 +268,8 @@ def render_text(cv: SkillCV, color: bool = False) -> str:
     lines.append("╠" + "═" * width + "╣")
     lines.append("╚" + "═" * width + "╝")
     lines.append(cv.description)
+    roles = infer_roles(cv.capabilities)
+    lines.append(c("Profile: ", _BOLD) + " · ".join(r.name for r in roles))
     lines.append("")
     badge = _VERDICT_BADGE[cv.verdict].split(" ", 1)[1]
     lines.append(
@@ -251,6 +277,17 @@ def render_text(cv: SkillCV, color: bool = False) -> str:
         + f"   Risk: {cv.risk_score}/100   Source: {cv.source}   Engine: {cv.report.engine}"
     )
     lines.append(c(f"Recommendation: {cv.recommendation}", _C[cv.verdict]))
+    lines.append("")
+
+    _TXT_MARK = {"danger": "[!!]", "caution": "[! ]", "info": "[i ]"}
+    _TXT_COLOR = {
+        "danger": _C[Verdict.MALICIOUS],
+        "caution": _C[Verdict.SUSPICIOUS],
+        "info": "",
+    }
+    lines.append(c("WHAT THIS MEANS FOR YOU", _BOLD))
+    for level, text in plain_english_implications(cv.capabilities):
+        lines.append("  " + c(f"{_TXT_MARK[level]} {text}", _TXT_COLOR[level]))
     lines.append("")
 
     lines.append(c("CAPABILITIES", _BOLD))
