@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **GitHub Action install** — `action.yml` installed a non-existent `vouch`
+  package (the distribution is `vouch-agent`); it now installs `vouch-agent`
+  from PyPI, so the CI Action actually works.
+
+### Added
+- `vouch --version` — prints the installed version.
+- `py.typed` marker is now shipped, so downstream type checkers see Vouch's
+  type hints (matches the `Typing :: Typed` classifier).
+
+### Changed
+- Real author metadata on PyPI; pre-commit `rev` example bumped to `v0.5.0`;
+  Action `use-llm` doc no longer implies Cursor-only.
+
 ## [0.5.0] - 2026-09-08
 
 ### Added

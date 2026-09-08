@@ -17,7 +17,7 @@ import argparse
 import os
 import sys
 
-from . import loader
+from . import __version__, loader
 from .engine import validate_skill
 from .models import Report, Severity, Verdict
 
@@ -100,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="vouch",
         description="Vet an agent Skill (or agent) and vouch for it: "
         "classify as valid, suspicious, or malicious.",
+    )
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     p.add_argument(
         "target",

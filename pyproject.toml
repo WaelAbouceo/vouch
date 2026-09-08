@@ -9,7 +9,7 @@ description = "Vouch — the trust layer for AI agents. Vet Skills and agents, p
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "SKILLS_RGB" }]
+authors = [{ name = "Wael Abouella" }]
 keywords = [
   "security",
   "agents",
@@ -69,6 +69,9 @@ vouch-mcp = "vouch.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+vouch = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
