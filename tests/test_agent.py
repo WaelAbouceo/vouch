@@ -51,3 +51,21 @@ def test_agent_cv_serializable():
 
     cv = build_agent_cv(str(AGENT), use_llm=False)
     json.loads(json.dumps(cv.to_dict()))
+
+
+def test_toplevel_renderers_dispatch_on_cv_type():
+    """The package-level render_text/render_markdown must handle BOTH
+    SkillCV and AgentCV (regression: they previously only handled SkillCV)."""
+    import vouch
+    from vouch import build_cv, render_markdown, render_text
+
+    skill_cv = build_cv(str(EXAMPLES / "benign-skill"), use_llm=False)
+    agent_cv = build_agent_cv(str(AGENT), use_llm=False)
+
+    assert isinstance(skill_cv, vouch.SkillCV)
+    assert isinstance(agent_cv, vouch.AgentCV)
+
+    assert "SKILL CV" in render_text(skill_cv)
+    assert "AGENT CV" in render_text(agent_cv)
+    assert render_markdown(skill_cv).startswith("# Skill CV")
+    assert render_markdown(agent_cv).startswith("# Agent CV")

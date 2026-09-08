@@ -6,13 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-08
+
+### Fixed
+- The package-level `render_text()` and `render_markdown()` now dispatch on the
+  CV type, so they render an **`AgentCV`** as well as a `SkillCV`. Previously
+  `from vouch import render_text; render_text(agent_cv)` raised
+  `AttributeError`.
+
+## [0.3.0] - 2026-09-08
+
 ### Added
 - Packaging for PyPI under the distribution name `vouch-agent` (the import
   package and CLI remain `vouch`). Automated publish via GitHub Actions using
   PyPI Trusted Publishing (OIDC) — see `.github/workflows/release.yml`.
 - PyPI classifiers and project URLs.
-
-## [0.3.0] - 2026-09-08
 
 ### Added
 - **Capability-composition gate** — verdicts are now weighted by capability
@@ -50,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release: hybrid static + LLM validation engine, CLI, and rule set.
 
-[Unreleased]: https://github.com/WaelAbouceo/vouch/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/WaelAbouceo/vouch/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/WaelAbouceo/vouch/releases/tag/v0.3.1
 [0.3.0]: https://github.com/WaelAbouceo/vouch/releases/tag/v0.3.0
 [0.2.0]: https://github.com/WaelAbouceo/vouch/releases/tag/v0.2.0
 [0.1.0]: https://github.com/WaelAbouceo/vouch/releases/tag/v0.1.0
