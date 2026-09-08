@@ -12,7 +12,24 @@ import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .capabilities import _executable_lines, _is_comment_line
 from .models import Finding, Severity, SkillFile, SkillInput
+
+# Command/execution-style threat rules mean "this code *runs* something
+# dangerous". They are only genuine threats in executable context (a fenced code
+# block or a script file). When the same string appears in prose — e.g. a
+# security tool quoting an attack as a detection pattern, or documentation
+# showing what NOT to do — it is downgraded to an awareness notice rather than
+# forcing a "malicious" verdict. Prompt-injection rules (INJ*) are deliberately
+# excluded: they are attacks addressed to the reading agent and are malicious
+# precisely as prose, so they always count regardless of context.
+_EXEC_CONTEXT_RULES = frozenset({
+    "RCE003", "RCE004", "RCE005",
+    "DES001", "DES002", "DES003",
+    "EXF001", "EXF005", "EXF007",
+    "OBF003",
+    "NET001",
+})
 
 
 @dataclass(frozen=True)
@@ -83,6 +100,16 @@ RULES: list[Rule] = [
         Severity.HIGH,
         _rx(r"\beval\s+[\"']?\$"),
         "Uses shell `eval` on dynamic input, enabling arbitrary command injection.",
+    ),
+    Rule(
+        "RCE005",
+        "Makes a downloaded/temp file executable or runs one",
+        Severity.HIGH,
+        _rx(r"(chmod\s+[+0-7]*x[^\n]*\s+[^\n]*(/tmp/|/var/tmp/|/dev/shm/)|"
+            r"^\s*(sudo\s+)?(\./)?(/tmp/|/var/tmp/|/dev/shm/)\S+\s*$)"),
+        "Marks a file in a temp directory as executable or runs one directly. "
+        "Combined with a download this is the classic 'dropper' pattern: fetch an "
+        "untrusted binary to /tmp and execute it.",
     ),
     # --- Destructive commands -------------------------------------------
     Rule(
@@ -157,11 +184,11 @@ RULES: list[Rule] = [
     Rule(
         "EXF007",
         "Pipes environment/secrets into a network sender",
-        Severity.HIGH,
+        Severity.CRITICAL,
         _rx(r"\b(env|printenv|cat\s+[^\n|]*(\.ssh|\.env|id_[a-z0-9]+|secret|token|"
             r"credential)[^\n|]*)\b[^\n]*\|\s*[^\n]*\b(curl|wget|nc|ncat|netcat)\b"),
         "Reads environment variables or secret files and pipes them straight into "
-        "a network tool — a direct data-exfiltration pattern.",
+        "a network tool — a direct, unambiguous data-exfiltration pattern.",
     ),
     Rule(
         "EXF006",
@@ -404,7 +431,14 @@ def _is_private_ip(text: str) -> bool:
 def run_rules(skill: SkillInput) -> list[Finding]:
     """Run all static rules over every file in the skill."""
     findings: list[Finding] = []
+    # Raw text handed in directly (stdin / validate_text) is a direct check of
+    # content, so every line counts as executable. Files/dirs loaded from disk
+    # use fenced-code detection so prose mentions of a command are not treated as
+    # the command actually running (see ``_EXEC_CONTEXT_RULES``).
+    force_strong = skill.source == "text"
     for sf in skill.files:
+        content_lines = sf.content.splitlines()
+        exec_lines = None if force_strong else _executable_lines(sf.content, sf.path)
         applicable = [
             r
             for r in RULES
@@ -417,6 +451,16 @@ def run_rules(skill: SkillInput) -> list[Finding]:
                 # exfiltration endpoints and produce heavy false positives.
                 if rule.rule_id == "EXF006" and _is_private_ip(excerpt):
                     continue
+                line = _line_of(sf.content, m.start())
+                category = rule.category
+                # Context grading: an execution-style rule that matches only in
+                # prose/comment (not a fenced block or script) is downgraded to a
+                # notice so quoted/documented commands don't force "malicious".
+                if category == "threat" and rule.rule_id in _EXEC_CONTEXT_RULES:
+                    line_text = content_lines[line - 1] if line <= len(content_lines) else ""
+                    in_exec = exec_lines is None or line in exec_lines
+                    if not in_exec or _is_comment_line(line_text):
+                        category = "notice"
                 # Trim very long matches (e.g. base64 blobs) for readability.
                 if len(excerpt) > 120:
                     excerpt = excerpt[:117] + "..."
@@ -427,9 +471,9 @@ def run_rules(skill: SkillInput) -> list[Finding]:
                         severity=rule.severity,
                         detail=rule.detail,
                         source="static",
-                        category=rule.category,
+                        category=category,
                         file=sf.path,
-                        line=_line_of(sf.content, m.start()),
+                        line=line,
                         excerpt=excerpt,
                     )
                 )
