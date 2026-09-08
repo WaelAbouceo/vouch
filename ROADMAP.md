@@ -13,7 +13,8 @@ data-driven "wow" moment → deep integrations → community & credibility.
 - [x] GitHub Action to scan skills in CI (`action.yml`)
 - [x] pre-commit hook (`.pre-commit-hooks.yaml`)
 - [x] CI workflow (tests + self-scan on every push/PR)
-- [ ] README: animated demo GIF/asciinema of the CV catching a malicious skill
+- [x] README: animated demo GIF of the CV catching a malicious skill
+      (`docs/demo.gif`, regenerate with `python scripts/gen_demo.py`)
 - [x] README badges (PyPI, CI, license)
 
 ## Phase 2 — The wow moment (launch)

@@ -10,6 +10,8 @@ what it can do, and vouch only for the ones that are safe to run.
 
 > _References for your agents — never run a skill you can't vouch for._
 
+![Vouch demo — a Skill CV catching a malicious skill](docs/demo.gif)
+
 A "Skill" is a package of instructions (`SKILL.md`) plus optional scripts that an
 autonomous agent will read and may execute. Before an agent loads a skill, this
 toolkit audits it for prompt injection, data exfiltration, destructive commands,

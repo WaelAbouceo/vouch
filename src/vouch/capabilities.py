@@ -136,6 +136,10 @@ def scan_capabilities(skill: SkillInput) -> list[Capability]:
                         if line <= len(content_lines)
                         else ""
                     )
+                    # Don't use markdown code-fence markers as evidence — they're
+                    # noise (e.g. ```bash). The capability still counts as present.
+                    if snippet.startswith("```"):
+                        continue
                     cap.evidence.append(Evidence(sf.path, line, snippet[:120]))
     return list(caps.values())
 
