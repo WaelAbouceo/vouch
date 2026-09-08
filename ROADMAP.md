@@ -7,7 +7,9 @@ Traction strategy: sharp positioning → zero-friction distribution → a
 data-driven "wow" moment → deep integrations → community & credibility.
 
 ## Phase 1 — Trivially adoptable  _(in progress)_
-- [ ] Publish to PyPI (`pip install vouch`, `pipx run vouch`)
+- [ ] Publish to PyPI — deferred. NOTE: the name `vouch` is already taken on
+      PyPI, so pick a distribution name when publishing (e.g. `vouch-agents` or
+      `agent-vouch`); the `import vouch` name can stay the same.
 - [x] GitHub Action to scan skills in CI (`action.yml`)
 - [x] pre-commit hook (`.pre-commit-hooks.yaml`)
 - [x] CI workflow (tests + self-scan on every push/PR)
