@@ -25,6 +25,13 @@ from .rules import run_rules
 SUSPICIOUS_THRESHOLD = 20
 MALICIOUS_THRESHOLD = 55
 
+# Map an LLM's textual verdict to our enum (advisory only — see validate()).
+_STR_TO_VERDICT = {
+    "valid": Verdict.VALID,
+    "suspicious": Verdict.SUSPICIOUS,
+    "malicious": Verdict.MALICIOUS,
+}
+
 
 @dataclass(frozen=True)
 class CapabilityCombo:
@@ -103,11 +110,13 @@ class Engine:
         model: str | None = None,
         api_key: str | None = None,
         human_signoff: bool = False,
+        provider: str | None = None,
     ) -> None:
         self.use_llm = use_llm
         self.model = model
         self.api_key = api_key
         self.human_signoff = human_signoff
+        self.provider = provider
 
     # -- scoring ---------------------------------------------------------
     @staticmethod
@@ -159,9 +168,9 @@ class Engine:
         engine = "static + LLM" if llm_used else "static"
         if review_required:
             base = (
-                f"{verdict.value.upper()} — verdict floored: a dangerous capability "
-                f"combination requires LLM or human review before this skill can be "
-                f"trusted ({engine} analysis only)."
+                f"{verdict.value.upper()} — flagged for review before this skill "
+                f"can be trusted (see review reasons; {engine} analysis). "
+                f"Clear it with a human sign-off (--sign-off)."
             )
         elif verdict == Verdict.VALID and n == 0:
             return f"No security concerns detected ({engine} analysis). Skill looks valid."
@@ -199,38 +208,78 @@ class Engine:
                 )
             )
 
+        llm_verdict: Verdict | None = None
         if self.use_llm:
             from . import llm  # imported lazily to keep base install light
 
             llm_result = llm.analyze_with_llm(
-                skill, model=self.model, api_key=self.api_key
+                skill,
+                model=self.model,
+                api_key=self.api_key,
+                provider=self.provider,
             )
             if llm_result is not None:
                 llm_used = True
                 engine_name = "hybrid"
                 findings = findings + llm_result.findings
                 summary_override = llm_result.summary
+                llm_verdict = _STR_TO_VERDICT.get(llm_result.verdict)
 
-        # Only genuine threats drive the score/verdict. Awareness notices
-        # (install scripts, secret env vars, scheduled tasks, ...) are surfaced
-        # but never make a skill suspicious or malicious on their own.
-        threats = [f for f in findings if f.category != "notice"]
+        # Only *deterministic* threats (static rules) drive the score and are the
+        # ONLY thing that can yield a 'malicious' verdict. Awareness notices,
+        # capability combinations, and LLM findings are excluded here: notices
+        # are informational, combos are handled by the review gate, and the LLM
+        # is non-deterministic — it must never brand a skill malicious on its own.
+        threats = [
+            f for f in findings
+            if f.category != "notice" and f.source not in ("capability", "llm")
+        ]
         score = self._score(threats)
         verdict = self._verdict(score, threats)
 
-        # -- capability gate -------------------------------------------
-        # A dangerous capability combination cannot yield a clean 'valid' from a
-        # static-only pass. The gate lifts if the LLM actually ran or a human
-        # signed off. It never downgrades a malicious verdict.
+        # Does the LLM want to raise a concern? (Its holistic verdict is not
+        # 'valid', or it cited a high/critical finding.) The LLM can flag a skill
+        # for review — raising it to at most SUSPICIOUS — but cannot declare it
+        # malicious, because the same model varies run-to-run.
+        llm_concern = False
+        if llm_used:
+            if llm_verdict is not None and llm_verdict != Verdict.VALID:
+                llm_concern = True
+            if any(
+                f.source == "llm" and f.severity.weight >= Severity.HIGH.weight
+                for f in findings
+            ):
+                llm_concern = True
+
         review_required = False
         review_reasons: list[str] = []
+
+        # -- capability gate -------------------------------------------
+        # A dangerous capability combination cannot yield a clean 'valid'. The
+        # gate lifts only on a *clean* LLM pass (ran and raised no concern) or a
+        # human sign-off. It never downgrades a malicious verdict.
         if combos and verdict != Verdict.MALICIOUS:
-            cleared = llm_used or self.human_signoff
-            review_reasons = [f"{c.title} ({', '.join(sorted(c.caps))})" for c in combos]
+            cleared = (llm_used and not llm_concern) or self.human_signoff
             if not cleared:
                 review_required = True
+                review_reasons = [
+                    f"{c.title} ({', '.join(sorted(c.caps))})" for c in combos
+                ]
                 if verdict == Verdict.VALID:
                     verdict = Verdict.SUSPICIOUS
+
+        # -- LLM concern: flag for review, capped at SUSPICIOUS --------
+        if llm_concern and verdict != Verdict.MALICIOUS:
+            review_required = True
+            if verdict == Verdict.VALID:
+                verdict = Verdict.SUSPICIOUS
+            if llm_verdict == Verdict.MALICIOUS:
+                review_reasons.append(
+                    "LLM auditor rated this malicious — needs human confirmation "
+                    "(LLM judgments are advisory and vary between runs)"
+                )
+            else:
+                review_reasons.append("LLM auditor flagged this for review")
 
         summary = self._summarize(verdict, threats, llm_used, review_required)
         n_notices = sum(1 for f in findings if f.category == "notice")
@@ -258,17 +307,31 @@ class Engine:
 # ---------------------------------------------------------------------------
 
 
+_LLM_KEY_ENVS = (
+    "SEG_API_KEY",
+    "SOVEREIGNEG_API_KEY",
+    "CURSOR_API_KEY",
+    "OPENAI_API_KEY",
+    "VOUCH_LLM_API_KEY",
+)
+
+
 def _engine(
     use_llm: bool | None,
     model: str | None,
     api_key: str | None,
     human_signoff: bool,
+    provider: str | None = None,
 ) -> Engine:
     if use_llm is None:
-        # Auto: enable LLM only if plausibly configured.
-        use_llm = bool(api_key or os.environ.get("CURSOR_API_KEY"))
+        # Auto: enable LLM only if some backend is plausibly configured.
+        use_llm = bool(api_key) or any(os.environ.get(k) for k in _LLM_KEY_ENVS)
     return Engine(
-        use_llm=use_llm, model=model, api_key=api_key, human_signoff=human_signoff
+        use_llm=use_llm,
+        model=model,
+        api_key=api_key,
+        human_signoff=human_signoff,
+        provider=provider,
     )
 
 
@@ -279,9 +342,10 @@ def validate_skill(
     model: str | None = None,
     api_key: str | None = None,
     human_signoff: bool = False,
+    provider: str | None = None,
 ) -> Report:
     """Validate an already-loaded :class:`SkillInput`."""
-    return _engine(use_llm, model, api_key, human_signoff).validate(skill)
+    return _engine(use_llm, model, api_key, human_signoff, provider).validate(skill)
 
 
 def validate_path(
@@ -291,6 +355,7 @@ def validate_path(
     model: str | None = None,
     api_key: str | None = None,
     human_signoff: bool = False,
+    provider: str | None = None,
 ) -> Report:
     """Load a skill directory or file from ``path`` and validate it."""
     return validate_skill(
@@ -299,6 +364,7 @@ def validate_path(
         model=model,
         api_key=api_key,
         human_signoff=human_signoff,
+        provider=provider,
     )
 
 
@@ -310,6 +376,7 @@ def validate_text(
     model: str | None = None,
     api_key: str | None = None,
     human_signoff: bool = False,
+    provider: str | None = None,
 ) -> Report:
     """Validate raw skill ``content`` supplied in memory."""
     return validate_skill(
@@ -318,4 +385,5 @@ def validate_text(
         model=model,
         api_key=api_key,
         human_signoff=human_signoff,
+        provider=provider,
     )

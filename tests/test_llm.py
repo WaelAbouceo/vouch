@@ -1,0 +1,218 @@
+"""Tests for the provider-agnostic LLM auditor and its effect on verdicts.
+
+These never call a real model. They use the ``responder`` injection hook and
+monkeypatching so the hybrid pipeline is fully exercised offline.
+"""
+
+import json
+from pathlib import Path
+
+from vouch import llm, loader, validate_skill, validate_text
+from vouch.models import Verdict
+
+BENCH = Path(__file__).resolve().parents[1] / "bench"
+
+
+def _canned(verdict: str, findings=None, summary="ok"):
+    payload = {
+        "verdict": verdict,
+        "confidence": 0.9,
+        "summary": summary,
+        "findings": findings or [],
+    }
+    return lambda system, prompt: json.dumps(payload)
+
+
+# --- parsing ---------------------------------------------------------------
+
+def test_parse_plain_json():
+    r = llm._parse('{"verdict":"malicious","confidence":0.8,"summary":"bad","findings":[]}')
+    assert r is not None
+    assert r.verdict == "malicious"
+    assert r.confidence == 0.8
+
+
+def test_parse_fenced_json():
+    raw = "```json\n{\"verdict\": \"valid\", \"findings\": []}\n```"
+    r = llm._parse(raw)
+    assert r is not None
+    assert r.verdict == "valid"
+
+
+def test_parse_unknown_verdict_defaults_suspicious():
+    r = llm._parse('{"verdict":"banana","findings":[]}')
+    assert r.verdict == "suspicious"
+
+
+def test_parse_garbage_returns_none():
+    assert llm._parse("not json at all") is None
+
+
+def test_parse_promotes_findings_with_severity():
+    raw = json.dumps({
+        "verdict": "malicious",
+        "findings": [{"title": "exfil", "severity": "critical", "detail": "sends keys"}],
+    })
+    r = llm._parse(raw)
+    assert len(r.findings) == 1
+    assert r.findings[0].source == "llm"
+    assert r.findings[0].rule_id == "LLM"
+
+
+# --- responder injection ---------------------------------------------------
+
+def test_analyze_with_responder():
+    skill = loader.load_text("# demo\nsome content")
+    r = llm.analyze_with_llm(skill, responder=_canned("suspicious"))
+    assert r is not None
+    assert r.verdict == "suspicious"
+    assert r.provider == "custom"
+
+
+def test_analyze_with_responder_returning_none():
+    skill = loader.load_text("# demo")
+    r = llm.analyze_with_llm(skill, responder=lambda s, p: None)
+    assert r is None
+
+
+# --- engine integration: escalation & non-softening ------------------------
+
+def test_llm_flags_for_review_but_never_malicious(monkeypatch):
+    # Static sees nothing; even if the LLM says 'malicious', the worst it can do
+    # on its own is flag the skill for review (SUSPICIOUS) — never brand it
+    # malicious, because LLM judgments vary run-to-run.
+    def fake(skill, **kw):
+        return llm.LLMResult("malicious", 0.95, "clearly bad", [], provider="custom")
+
+    monkeypatch.setattr(llm, "analyze_with_llm", fake)
+    r = validate_text("# Formatter\nTidies whitespace only.", use_llm=True)
+    assert r.verdict == Verdict.SUSPICIOUS
+    assert r.review_required is True
+    assert r.llm_used is True
+    assert r.engine == "hybrid"
+    assert any("LLM" in reason for reason in r.review_reasons)
+
+
+def test_llm_cannot_soften_a_static_threat(monkeypatch):
+    # A genuine static threat stays malicious even if the LLM says 'valid'.
+    def fake(skill, **kw):
+        return llm.LLMResult("valid", 0.99, "looks fine to me", [], provider="custom")
+
+    monkeypatch.setattr(llm, "analyze_with_llm", fake)
+    r = validate_text("rm -rf / --no-preserve-root\n", use_llm=True)
+    assert r.verdict == Verdict.MALICIOUS
+
+
+def test_llm_lifts_capability_gate_when_clean(monkeypatch):
+    # A dangerous combo is floored to suspicious static-only; a clean LLM pass
+    # lifts the review gate.
+    combo = (
+        "# Sync\nUse requests.get('https://api.example.com') with api_key to "
+        "fetch and then run bash to configure.\n"
+    )
+    static = validate_text(combo, use_llm=False)
+    assert static.verdict == Verdict.SUSPICIOUS
+    assert static.review_required is True
+
+    def fake(skill, **kw):
+        return llm.LLMResult("valid", 0.9, "benign config sync", [], provider="custom")
+
+    monkeypatch.setattr(llm, "analyze_with_llm", fake)
+    hybrid = validate_text(combo, use_llm=True)
+    assert hybrid.verdict == Verdict.VALID
+    assert hybrid.review_required is False
+
+
+def test_hybrid_flags_obfuscated_rm_for_review(monkeypatch):
+    # The known static miss: variable-assembled `rm -rf`. Static returns valid;
+    # the LLM catches it and the hybrid result becomes SUSPICIOUS (flagged for
+    # review) — not malicious, since that verdict is reserved for deterministic
+    # detections.
+    skill = loader.load(str(BENCH / "malicious" / "obfuscated-rm"))
+    assert validate_skill(skill, use_llm=False).verdict == Verdict.VALID
+
+    def fake(s, **kw):
+        return llm.LLMResult(
+            "malicious", 0.9, "assembles rm -rf from variables", [], provider="custom"
+        )
+
+    monkeypatch.setattr(llm, "analyze_with_llm", fake)
+    r = validate_skill(skill, use_llm=True)
+    assert r.verdict == Verdict.SUSPICIOUS
+    assert r.review_required is True
+
+
+# --- provider detection ----------------------------------------------------
+
+def test_available_provider_none_when_unconfigured(monkeypatch):
+    for k in (
+        "SEG_API_KEY", "SOVEREIGNEG_API_KEY", "CURSOR_API_KEY",
+        "OPENAI_API_KEY", "VOUCH_LLM_API_KEY",
+    ):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("VOUCH_LLM_PROVIDER", "auto")
+    assert llm.available_provider() is None
+    assert llm.is_available() is False
+
+
+def test_available_provider_prefers_explicit_choice(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("VOUCH_LLM_PROVIDER", "openai")
+    # openai package is installed in this env; provider should resolve to openai.
+    assert llm.available_provider() == "openai"
+
+
+# --- SovereignEG (seg) -----------------------------------------------------
+
+def _clear_llm_env(monkeypatch):
+    for k in (
+        "SEG_API_KEY", "SOVEREIGNEG_API_KEY", "CURSOR_API_KEY",
+        "OPENAI_API_KEY", "VOUCH_LLM_API_KEY",
+    ):
+        monkeypatch.delenv(k, raising=False)
+
+
+def test_seg_detected_when_key_set(monkeypatch):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("VOUCH_LLM_PROVIDER", "auto")
+    monkeypatch.setenv("SEG_API_KEY", "sk-seg-abc")
+    # Reachable via the OpenAI-compatible path (openai is installed here).
+    assert llm.available_provider() == "seg"
+    assert llm.is_available() is True
+
+
+def test_seg_takes_priority_over_openai(monkeypatch):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("VOUCH_LLM_PROVIDER", "auto")
+    monkeypatch.setenv("SEG_API_KEY", "sk-seg-abc")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
+    assert llm.available_provider() == "seg"
+
+
+def test_seg_pref_requires_key(monkeypatch):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("VOUCH_LLM_PROVIDER", "seg")
+    assert llm.available_provider() is None
+
+
+def test_sk_seg_api_key_routes_to_seg(monkeypatch):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("VOUCH_LLM_PROVIDER", "auto")
+    # An explicit sk-seg-* key is unmistakably SovereignEG.
+    assert llm.available_provider("sk-seg-xyz") == "seg"
+
+
+def test_seg_key_autoenables_llm(monkeypatch):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("SEG_API_KEY", "sk-seg-abc")
+
+    def fake(skill, **kw):
+        return llm.LLMResult("malicious", 0.9, "seg says bad", [], provider="seg")
+
+    monkeypatch.setattr(llm, "analyze_with_llm", fake)
+    # use_llm defaults to None -> auto-enabled because a SEG key is present.
+    r = validate_text("# Formatter\nTidies whitespace.", use_llm=None)
+    assert r.llm_used is True
+    # LLM concern flags for review, but cannot brand it malicious on its own.
+    assert r.verdict == Verdict.SUSPICIOUS
+    assert r.review_required is True
