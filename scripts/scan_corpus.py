@@ -44,19 +44,20 @@ DATA = ROOT / "data"
 CACHE = DATA / "corpus_cache"
 
 # Keyword queries paired with the SKILL.md filename qualifier. GitHub code
-# search requires a term alongside the qualifier; varying the term surfaces a
-# broader, less biased corpus.
+# search requires a term alongside the qualifier, and each query returns at most
+# ~1000 results, so varying the term is how we get past that cap and dedup a
+# broad, less-biased corpus.
 QUERIES = [
-    "description",
-    "name",
-    "usage",
-    "instructions",
-    "tools",
-    "when to use",
-    "examples",
-    "workflow",
-    "steps",
-    "agent",
+    # frontmatter / structure terms
+    "description", "name", "usage", "instructions", "tools", "examples",
+    "workflow", "steps", "when to use", "overview", "prerequisites", "output",
+    "input", "notes", "configuration", "arguments", "parameters", "context",
+    # domain / behavior terms
+    "agent", "claude", "mcp", "api", "python", "typescript", "bash", "install",
+    "git", "database", "file", "search", "image", "test", "deploy", "browser",
+    "http", "json", "markdown", "prompt", "review", "code", "data", "server",
+    # capability-ish terms (surface higher-signal skills too)
+    "curl", "token", "secret", "env", "shell", "network", "credentials",
 ]
 
 

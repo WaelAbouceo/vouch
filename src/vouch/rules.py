@@ -294,10 +294,12 @@ RULES: list[Rule] = [
     Rule(
         "PRV002",
         "Disables TLS/host verification",
-        Severity.MEDIUM,
+        Severity.LOW,
         _rx(r"(curl\s+[^\n]*(-k|--insecure)|verify\s*=\s*False|"
             r"NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*0|rejectUnauthorized\s*:\s*false)"),
-        "Disables TLS certificate verification, enabling MITM.",
+        "Disables TLS certificate verification, which enables MITM. Common in "
+        "dev/test snippets but risky if shipped — verify it is intentional.",
+        category="notice",
     ),
 ]
 

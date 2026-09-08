@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reclassified as awareness notices (no longer verdict-driving threats):
   `RCE001`/`RCE002` (curl|sh install scripts), `EXF002`/`EXF003`/`EXF004`
   (credential/secret file & env-var use), `EXF006` (hardcoded IP),
-  `PER001`/`PER002`/`PER003` (persistence), `PRV001` (permissions).
+  `PER001`/`PER002`/`PER003` (persistence), `PRV001` (permissions),
+  `PRV002` (disabled TLS verification).
 
 ### Fixed
 - `EXF006` no longer flags private / loopback / reserved IP addresses.
