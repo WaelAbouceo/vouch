@@ -14,16 +14,20 @@ my PC doing?* — without having to remember where each tool hides its skills.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import loader
 from .agent import discover_skills
 from .capabilities import infer_roles, plain_english_implications
 from .cv import build_cv
-from .models import Verdict
+from .models import SkillInput, Verdict
 
 _VERDICT_RANK = {Verdict.VALID: 0, Verdict.SUSPICIOUS: 1, Verdict.MALICIOUS: 2}
 
@@ -81,6 +85,7 @@ class AuditEntry:
     review_required: bool
     roles: list[str]
     headline: str  # the single most important "what this means" line
+    fingerprint: str = ""  # content hash, to detect a skill being updated
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -92,7 +97,19 @@ class AuditEntry:
             "review_required": self.review_required,
             "roles": self.roles,
             "headline": self.headline,
+            "fingerprint": self.fingerprint,
         }
+
+
+def _fingerprint(skill: SkillInput) -> str:
+    """A stable short hash of a skill's file contents (detects updates)."""
+    h = hashlib.sha256()
+    for f in sorted(skill.files, key=lambda f: f.path):
+        h.update(f.path.encode("utf-8", "replace"))
+        h.update(b"\0")
+        h.update(f.content.encode("utf-8", "replace"))
+        h.update(b"\0")
+    return h.hexdigest()[:16]
 
 
 @dataclass
@@ -150,8 +167,9 @@ def audit_machine(
         if not rp.is_dir():
             continue
         for sd in discover_skills(rp):
+            skill = loader.load(str(sd))
             cv = build_cv(
-                str(sd),
+                skill,
                 use_llm=use_llm,
                 model=model,
                 api_key=api_key,
@@ -169,6 +187,7 @@ def audit_machine(
                     review_required=cv.report.review_required,
                     roles=[r.name for r in infer_roles(cv.capabilities)],
                     headline=headline,
+                    fingerprint=_fingerprint(skill),
                 )
             )
 
@@ -176,6 +195,162 @@ def audit_machine(
         key=lambda e: (_VERDICT_RANK[e.verdict], e.risk_score), reverse=True
     )
     return MachineAudit(roots=[str(r) for r in root_paths], entries=entries)
+
+
+# ---------------------------------------------------------------------------
+# Baseline + diff ("what changed since last audit")
+# ---------------------------------------------------------------------------
+
+BASELINE_VERSION = 1
+
+
+def default_baseline_path() -> Path:
+    """Where the audit baseline is stored (``$VOUCH_HOME`` or ``~/.vouch``)."""
+    home = os.environ.get("VOUCH_HOME") or os.path.join(os.path.expanduser("~"), ".vouch")
+    return Path(home) / "audit-baseline.json"
+
+
+def save_baseline(audit: MachineAudit, path: str | os.PathLike[str]) -> None:
+    """Persist the current audit as the baseline for future comparisons."""
+    p = Path(path)
+    data = {
+        "version": BASELINE_VERSION,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "roots": audit.roots,
+        "entries": {
+            e.path: {
+                "name": e.name,
+                "verdict": e.verdict.value,
+                "risk_score": e.risk_score,
+                "review_required": e.review_required,
+                "roles": sorted(e.roles),
+                "fingerprint": e.fingerprint,
+            }
+            for e in audit.entries
+        },
+    }
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def load_baseline(path: str | os.PathLike[str]) -> dict[str, Any] | None:
+    """Load a saved baseline, or ``None`` if it does not exist / is unreadable."""
+    p = Path(path)
+    if not p.is_file():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+@dataclass
+class SkillChange:
+    name: str
+    path: str
+    before_verdict: str
+    after_verdict: str
+    risk_before: int
+    risk_after: int
+    added_roles: list[str]
+    removed_roles: list[str]
+    content_changed: bool
+
+    @property
+    def verdict_changed(self) -> bool:
+        return self.before_verdict != self.after_verdict
+
+    @property
+    def is_newly_risky(self) -> bool:
+        """True if this change moves the skill in a more dangerous direction."""
+        worse_verdict = (
+            _VERDICT_RANK.get(Verdict(self.after_verdict), 0)
+            > _VERDICT_RANK.get(Verdict(self.before_verdict), 0)
+        )
+        gained_danger = any(
+            r in {"Data Courier", "Remote Code Runner", "Resident Installer"}
+            for r in self.added_roles
+        )
+        return worse_verdict or gained_danger
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "path": self.path,
+            "before_verdict": self.before_verdict,
+            "after_verdict": self.after_verdict,
+            "risk_before": self.risk_before,
+            "risk_after": self.risk_after,
+            "added_roles": self.added_roles,
+            "removed_roles": self.removed_roles,
+            "content_changed": self.content_changed,
+            "newly_risky": self.is_newly_risky,
+        }
+
+
+@dataclass
+class AuditDiff:
+    new: list[AuditEntry] = field(default_factory=list)
+    removed: list[dict[str, Any]] = field(default_factory=list)
+    changed: list[SkillChange] = field(default_factory=list)
+
+    @property
+    def has_changes(self) -> bool:
+        return bool(self.new or self.removed or self.changed)
+
+    @property
+    def newly_risky(self) -> list[SkillChange]:
+        return [c for c in self.changed if c.is_newly_risky]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "new": [e.to_dict() for e in self.new],
+            "removed": self.removed,
+            "changed": [c.to_dict() for c in self.changed],
+        }
+
+
+def diff_audit(current: MachineAudit, baseline: dict[str, Any]) -> AuditDiff:
+    """Compare a current audit against a saved baseline dict."""
+    base_entries: dict[str, Any] = baseline.get("entries", {}) or {}
+    diff = AuditDiff()
+    seen: set[str] = set()
+
+    for e in current.entries:
+        seen.add(e.path)
+        b = base_entries.get(e.path)
+        if b is None:
+            diff.new.append(e)
+            continue
+        before_roles = set(b.get("roles", []))
+        after_roles = set(e.roles)
+        added = sorted(after_roles - before_roles)
+        removed = sorted(before_roles - after_roles)
+        content_changed = bool(b.get("fingerprint")) and b["fingerprint"] != e.fingerprint
+        verdict_changed = b.get("verdict") != e.verdict.value
+        if added or removed or content_changed or verdict_changed:
+            diff.changed.append(
+                SkillChange(
+                    name=e.name,
+                    path=e.path,
+                    before_verdict=b.get("verdict", "unknown"),
+                    after_verdict=e.verdict.value,
+                    risk_before=int(b.get("risk_score", 0)),
+                    risk_after=e.risk_score,
+                    added_roles=added,
+                    removed_roles=removed,
+                    content_changed=content_changed,
+                )
+            )
+
+    for path, b in base_entries.items():
+        if path not in seen:
+            diff.removed.append({"path": path, **b})
+
+    # Most alarming first.
+    diff.changed.sort(key=lambda c: (c.is_newly_risky, c.risk_after), reverse=True)
+    return diff
 
 
 # ---------------------------------------------------------------------------
@@ -253,6 +428,47 @@ def render_text(audit: MachineAudit, color: bool = False) -> str:
         worst = max((e.verdict for e in here), key=lambda v: _VERDICT_RANK[v])
         tag = c(worst.value.upper(), _C[worst])
         lines.append(f"  {len(here):>2} skill(s)  [{tag}]  {root}")
+    return "\n".join(lines)
+
+
+def render_diff_text(diff: AuditDiff, color: bool = False, first_run: bool = False) -> str:
+    def c(text: str, code: str) -> str:
+        return f"{code}{text}{_RESET}" if color else text
+
+    lines: list[str] = []
+    lines.append(c("CHANGED SINCE LAST AUDIT", _BOLD))
+    if first_run:
+        lines.append("  First audit — baseline saved. Re-run later to see what changed.")
+        return "\n".join(lines)
+    if not diff.has_changes:
+        lines.append("  Nothing changed since your last audit.")
+        return "\n".join(lines)
+
+    for e in diff.new:
+        roles = ", ".join(e.roles) or "—"
+        verdict = e.verdict.value.upper()
+        lines.append(c(f"  + NEW  {verdict:10} {e.name}  ({roles})", _C[e.verdict]))
+        if e.headline:
+            lines.append(f"             {e.headline}")
+
+    for ch in diff.changed:
+        code = _C[Verdict.MALICIOUS] if ch.is_newly_risky else _C[Verdict.SUSPICIOUS]
+        flag = "⚠ MORE RISKY" if ch.is_newly_risky else "changed"
+        lines.append(c(f"  ~ {flag:11} {ch.name}", code))
+        if ch.verdict_changed:
+            lines.append(
+                f"             verdict {ch.before_verdict} → {ch.after_verdict}"
+            )
+        if ch.added_roles:
+            lines.append(f"             gained: {', '.join(ch.added_roles)}")
+        if ch.removed_roles:
+            lines.append(f"             dropped: {', '.join(ch.removed_roles)}")
+        if ch.content_changed and not (ch.added_roles or ch.verdict_changed):
+            lines.append("             contents changed (same capabilities)")
+
+    for b in diff.removed:
+        lines.append(f"  - REMOVED  {b.get('name', b.get('path'))}")
+
     return "\n".join(lines)
 
 

@@ -104,6 +104,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Audit every skill installed on this machine (or under the given "
         "path/paths): classify what each one does and flag the risky ones.",
     )
+    p.add_argument(
+        "--baseline",
+        default=None,
+        metavar="PATH",
+        help="With --audit: baseline file to compare against and update "
+        "(default: ~/.vouch/audit-baseline.json). Enables 'what changed'.",
+    )
+    p.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help="With --audit: do a one-off scan without reading or writing a baseline.",
+    )
     p.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
     p.add_argument(
         "--cv",
@@ -170,14 +182,47 @@ def main(argv: list[str] | None = None) -> int:
             model=args.model,
             human_signoff=args.sign_off,
         )
+
+        # Baseline diff: "what changed since last audit".
+        diff = None
+        first_run = False
+        baseline_path = None
+        if not args.no_baseline:
+            from pathlib import Path as _Path
+
+            baseline_path = (
+                _Path(args.baseline) if args.baseline
+                else audit_mod.default_baseline_path()
+            )
+            base = audit_mod.load_baseline(baseline_path)
+            if base is None:
+                first_run = True
+            else:
+                diff = audit_mod.diff_audit(machine, base)
+
         if args.json:
             import json as _json
 
-            print(_json.dumps(machine.to_dict(), indent=2))
+            out = machine.to_dict()
+            if diff is not None:
+                out["diff"] = diff.to_dict()
+            print(_json.dumps(out, indent=2))
         elif args.markdown:
             print(audit_mod.render_markdown(machine))
         else:
             print(audit_mod.render_text(machine, color=color))
+            if not args.no_baseline:
+                print()
+                print(
+                    audit_mod.render_diff_text(
+                        diff or audit_mod.AuditDiff(), color=color, first_run=first_run
+                    )
+                )
+
+        # Update the baseline for next time.
+        if not args.no_baseline and baseline_path is not None:
+            audit_mod.save_baseline(machine, baseline_path)
+
         worst = audit_mod._worst(machine)
         if args.fail_on == "never":
             return 0

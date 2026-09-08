@@ -67,8 +67,11 @@ _CAP_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
         "shell",
         "Shell execution",
         re.compile(
-            r"\b(subprocess\.|os\.system|os\.popen|shell=True|/bin/(ba)?sh|"
-            r"\bsh\s+-c|\bbash\b|child_process|execSync|spawn\()\b",
+            # NB: no outer \b wrapper — it broke "/bin/sh" (no boundary between a
+            # leading space and "/"). Boundaries are applied per-alternative.
+            r"(\bsubprocess\.|\bos\.system|\bos\.popen|shell=True|"
+            r"/bin/(ba)?sh\b|\bsh\s+-c\b|\bbash\b|\bchild_process\b|"
+            r"\bexecSync\b|\bspawn\(|\b(nc|ncat|netcat)\s+-e\b)",
             re.IGNORECASE,
         ),
     ),
