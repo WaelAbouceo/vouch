@@ -4,6 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/vouch-agent.svg)](https://pypi.org/project/vouch-agent/)
 [![Python](https://img.shields.io/pypi/pyversions/vouch-agent.svg)](https://pypi.org/project/vouch-agent/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/WaelAbouceo/vouch/badge)](https://securityscorecards.dev/viewer/?uri=github.com/WaelAbouceo/vouch)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 
 **See what your AI agents can actually do.** One command audits every skill
@@ -69,10 +70,12 @@ vouch --audit /some/path     # scan a specific folder instead of the whole machi
 
 **"Malicious" is deterministic.** It comes only from static rules — the same
 skill always gets the same verdict, and Vouch never brands a benign skill as
-malware. On a labeled benchmark the static engine scores **100% precision (zero
-false accusations)** for "malicious" and **91% precision / 91% recall** for
-"flag this for review". See [`bench/README.md`](bench/README.md) for the full,
-honest numbers and how to reproduce them (`python scripts/benchmark.py`).
+malware. On a **small, labeled benchmark of 22 skills** (`bench/`) the static
+engine scores **100% precision (zero false accusations)** for "malicious" and
+**~92% precision / 100% recall** for "flag this for review". These are early
+numbers on a deliberately hard, hand-built set — treat them as directional, not
+a guarantee; growing the corpus is on the [roadmap](ROADMAP.md). Reproduce them
+with `python scripts/benchmark.py`; details in [`bench/README.md`](bench/README.md).
 
 A clean verdict means _"nothing our checks caught"_ — a strong filter, not a
 guarantee. Vouch checks for prompt injection, data exfiltration, destructive
@@ -80,6 +83,31 @@ commands, remote code execution, persistence, obfuscation, and privilege
 escalation, and it gates on **dangerous capability combinations** (e.g. reading
 secrets *and* reaching the network) so an evasive skill can't slip through as a
 clean `valid`.
+
+### Known limitations (read this before you rely on it)
+
+Vouch is a **static analyzer**, and a security tool you can't trust the *limits*
+of isn't worth much. Be blunt with yourself about what it does **not** catch:
+
+- **Deep obfuscation / staged payloads.** Vouch catches common tricks (base64→shell,
+  variable-assembled commands like `$A$B`, download-then-`chmod +x`-then-run), but
+  a sufficiently creative multi-stage chain whose individual steps each look benign
+  can still pass static analysis. The **capability gate** and the optional
+  **LLM layer** exist precisely to backstop this — but neither is a guarantee.
+- **Semantic intent.** Static rules see *patterns*, not *purpose*. A skill can do
+  everything "correctly" and still be malicious in effect (e.g. subtly wrong
+  destination for otherwise-normal network calls).
+- **False positives on defensive/security tools.** A linter or scanner that
+  **quotes** attacks (`ignore all previous instructions`, `rm -rf /`) as detection
+  patterns may be flagged for review. Command rules are context-graded (prose vs.
+  code) to reduce this, but prompt-injection rules intentionally fire in prose,
+  so some defensive tools will get a "review" flag. That's a deliberate
+  fail-loud tradeoff, not a bug.
+- **Runtime behavior.** Vouch never executes anything. It cannot see what a skill
+  does when it actually runs, only what its files declare.
+
+Bottom line: a `valid` from Vouch means *"passed a strong deterministic filter,"*
+not *"proven safe."* Use it to **triage and prioritize review**, not to rubber-stamp.
 
 ---
 

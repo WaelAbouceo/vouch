@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `OBF005` rule — catches commands assembled from concatenated shell variables
+  at a command position (`$A$B`), the classic trick for hiding a command like
+  `rm -rf` from scanners. Closes a known static blind spot (`obfuscated-rm` now
+  resolves to *suspicious / review*) with **zero hits across the 1,141-skill
+  corpus** (no new false positives).
+- **OpenSSF Scorecard** workflow + README badge — supply-chain trust signal.
+- README **"Known limitations"** section — blunt about what static analysis
+  can't catch (deep obfuscation, semantic intent, defensive-tool false
+  positives, runtime behavior).
+- `docs/scan-findings.md` — anonymized, review-framed write-up of the
+  1,141-skill scan for launch posts.
+
+### Fixed
+- Three provider-detection tests assumed the optional `openai` package was
+  installed; they now skip cleanly when it isn't, so a fresh clone (base + `dev`
+  deps) runs **green** in CI (93 passed, 3 skipped) instead of red.
+
+### Changed
+- README/bench benchmark stats corrected and qualified: static "flag for review"
+  is now **~92% precision / 100% recall** on the **22-skill** set (obfuscated-rm
+  no longer a miss), with an explicit "small, directional — growing the corpus"
+  caveat and a roadmap link. "Malicious" stays **100% precision**.
+
 ## [0.5.1] - 2026-09-08
 
 ### Fixed

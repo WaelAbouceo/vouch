@@ -30,7 +30,9 @@ data-driven "wow" moment → deep integrations → community & credibility.
 
 ## Phase 4 — Credibility & community
 - [ ] Curated, versioned rule DB with a CHANGELOG and named rules
-- [ ] Benchmark repo of labeled benign/malicious skills (detection quality)
+- [ ] **Grow the labeled benchmark to 100+ real-world samples** (draw from public
+      malicious-skill / malware corpora) so precision/recall numbers are
+      defensible under scrutiny. Current set is 22 hand-built skills (`bench/`).
 - [ ] `CONTRIBUTING.md` + "contribute a rule" guide (low-friction first PRs)
 - [ ] Security-advisory format for malicious skills we discover
 

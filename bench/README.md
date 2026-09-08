@@ -42,7 +42,7 @@ It reports two definitions of a "positive":
 
 | Mode | Precision | Recall | F1 | Notes |
 |------|-----------|--------|----|-------|
-| A — flagged for review | 91% | 91% | 0.91 | 1 miss, 1 false alarm |
+| A — flagged for review | 92% | **100%** | 0.96 | 0 misses; 1 false alarm (the defensive `prompt-linter` quoting attacks) |
 | B — classified malicious | 100% | 64% | 0.78 | 0 false accusations; some evasive threats land as "suspicious" |
 
 **Hybrid (static + LLM)** — measured live on [SovereignEG](https://sovereigneg.com)
@@ -59,9 +59,9 @@ non-deterministic: on real first-party skills we saw the same skill flip between
 `valid`, `suspicious`, and `malicious` across identical runs. So the LLM is used
 as a **recall booster for the *review queue***, not a malware oracle:
 
-- It raises evasive misses (`obfuscated-rm`, `staged-dropper`, `typosquat-fetch`)
-  to **suspicious / review** — Mode A recall becomes **100%** (nothing dangerous
-  is left as a clean "valid").
+- It reinforces evasive cases (`staged-dropper`, `typosquat-fetch`) in the
+  **suspicious / review** queue. (Static already reaches **100%** Mode A recall
+  on this set — nothing dangerous is left as a clean "valid".)
 - **"Malicious" stays reserved for deterministic static detections** — so that
   verdict is reproducible and trustworthy (100% precision, 0 false accusations),
   never a coin-flip from a weak model.
@@ -76,11 +76,12 @@ If you want the LLM's opinion to carry more weight, use a stronger model via
   review*, not *malicious*.
 - **It flags what matters** — every dangerous capability combination (network +
   secrets, network + shell, persistence, dropper) is surfaced for review.
-- **Static's one blind spot here:** `obfuscated-rm`, which assembles `rm -rf`
-  from single-character shell variables. Regex will always lose this arms race —
-  this is exactly the evasive case the **LLM auditor** exists for. The hybrid
-  numbers (run with `--llm` + a provider key) are the ones to beat; the LLM
-  verdict can escalate this miss to `malicious` (see `tests/test_llm.py`).
+- **Obfuscation is a moving target.** The `OBF005` rule now catches the
+  variable-assembled `rm -rf` trick (`$A$B`) — `obfuscated-rm` resolves to
+  *suspicious / review* statically, not "malicious" (a scanner can't prove the
+  assembled string is destructive without running it). But regex will always
+  lose the deep-obfuscation arms race eventually — that's what the **LLM auditor**
+  and the **capability gate** backstop. See the README's *Known limitations*.
 
 The honest headline is unchanged: **Vouch is a transparency + triage layer.** A
 clean verdict means "nothing our checks caught," not "proven safe."
