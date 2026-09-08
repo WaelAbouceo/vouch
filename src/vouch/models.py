@@ -82,16 +82,29 @@ class SkillInput:
 
 @dataclass
 class Finding:
-    """One issue detected during analysis."""
+    """One issue detected during analysis.
+
+    ``category`` separates genuine threats from *awareness notices* — behaviors
+    that are legitimate for many skills (running an install script, using a
+    secret env var, scheduling a task) but that a user should still be told
+    about before letting an agent run the skill. Notices are surfaced
+    prominently but do **not**, on their own, make a skill ``suspicious`` or
+    ``malicious``.
+    """
 
     rule_id: str
     title: str
     severity: Severity
     detail: str
-    source: str = "static"  # "static" | "llm"
+    source: str = "static"  # "static" | "llm" | "capability"
+    category: str = "threat"  # "threat" | "notice"
     file: str | None = None
     line: int | None = None
     excerpt: str | None = None
+
+    @property
+    def is_notice(self) -> bool:
+        return self.category == "notice"
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -119,6 +132,16 @@ class Report:
     @property
     def is_malicious(self) -> bool:
         return self.verdict == Verdict.MALICIOUS
+
+    @property
+    def threats(self) -> list[Finding]:
+        """Findings that count toward the verdict (real security concerns)."""
+        return [f for f in self.findings if f.category != "notice"]
+
+    @property
+    def notices(self) -> list[Finding]:
+        """Awareness items: legitimate-but-notable behaviors to surface."""
+        return [f for f in self.findings if f.category == "notice"]
 
     def to_dict(self) -> dict[str, Any]:
         return {

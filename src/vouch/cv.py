@@ -193,27 +193,33 @@ def render_markdown(cv: SkillCV) -> str:
         lines.append(f"- `{path}` ({n} lines)")
     lines.append("")
 
-    # Security
+    # Security (threats only)
+    threats = cv.report.threats
     lines.append("## Security findings")
-    total = sum(cv.findings_by_severity.values())
-    if total == 0:
-        lines.append("_No findings._")
+    if not threats:
+        lines.append("_No security threats detected._")
     else:
-        order = ["critical", "high", "medium", "low", "info"]
-        badge = ", ".join(
-            f"{cv.findings_by_severity[s]} {s}"
-            for s in order
-            if cv.findings_by_severity.get(s)
-        )
-        lines.append(f"**{total} finding(s):** {badge}")
+        lines.append(f"**{len(threats)} threat finding(s):**")
         lines.append("")
-        ordered = sorted(
-            cv.report.findings, key=lambda f: f.severity.weight, reverse=True
-        )
-        for f in ordered:
+        for f in sorted(threats, key=lambda f: f.severity.weight, reverse=True):
             loc = f" ({f.file}:{f.line})" if f.file else ""
             lines.append(f"- **[{f.severity.value.upper()}]** {f.rule_id}: {f.title}{loc}")
     lines.append("")
+
+    # Heads up (awareness notices)
+    notices = cv.report.notices
+    if notices:
+        lines.append("## Heads up — legitimate but worth knowing")
+        lines.append("")
+        lines.append(
+            "_These behaviors are common in benign skills, but you should be "
+            "aware of them before an agent runs this skill._"
+        )
+        lines.append("")
+        for f in sorted(notices, key=lambda f: f.severity.weight, reverse=True):
+            loc = f" (`{f.file}:{f.line}`)" if f.file else ""
+            lines.append(f"- {f.title}{loc}")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -263,21 +269,20 @@ def render_text(cv: SkillCV, color: bool = False) -> str:
     lines.append("")
 
     lines.append(c("SECURITY FINDINGS", _BOLD))
-    total = sum(cv.findings_by_severity.values())
-    if total == 0:
-        lines.append("  (none)")
+    threats = cv.report.threats
+    if not threats:
+        lines.append("  (no security threats detected)")
     else:
-        order = ["critical", "high", "medium", "low", "info"]
-        summary = "  ".join(
-            f"{cv.findings_by_severity[s]} {s}"
-            for s in order
-            if cv.findings_by_severity.get(s)
-        )
-        lines.append(f"  {total} total:  {summary}")
-        ordered = sorted(
-            cv.report.findings, key=lambda f: f.severity.weight, reverse=True
-        )
-        for f in ordered:
+        lines.append(f"  {len(threats)} threat(s):")
+        for f in sorted(threats, key=lambda f: f.severity.weight, reverse=True):
             loc = f" ({f.file}:{f.line})" if f.file else ""
             lines.append(f"  [{f.severity.value.upper():8}] {f.rule_id}: {f.title}{loc}")
+
+    notices = cv.report.notices
+    if notices:
+        lines.append("")
+        lines.append(c("HEADS UP — legitimate but worth knowing", _BOLD))
+        for f in sorted(notices, key=lambda f: f.severity.weight, reverse=True):
+            loc = f" ({f.file}:{f.line})" if f.file else ""
+            lines.append(f"  • {f.title}{loc}")
     return "\n".join(lines)

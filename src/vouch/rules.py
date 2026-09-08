@@ -24,6 +24,9 @@ class Rule:
     detail: str
     # Only run against files matching this predicate (default: all files).
     applies_to: Callable[[SkillFile], bool] | None = None
+    # "threat" counts toward the verdict; "notice" is surfaced for awareness
+    # only (legitimate-but-notable behavior) and never escalates a verdict.
+    category: str = "threat"
 
 
 def _any(_f: SkillFile) -> bool:
@@ -49,18 +52,23 @@ RULES: list[Rule] = [
     # --- Remote code execution / piping to shell -------------------------
     Rule(
         "RCE001",
-        "Pipe remote content directly to a shell interpreter",
-        Severity.CRITICAL,
+        "Runs a remote script fetched over the network (curl | sh)",
+        Severity.MEDIUM,
         _rx(r"(curl|wget|fetch)\b[^\n|]*\|\s*(sudo\s+)?(ba|z|)sh\b"),
-        "Downloads a remote script and executes it immediately, a classic "
-        "malware installation pattern.",
+        "Fetches remote content and pipes it straight into a shell. This is the "
+        "standard install-script pattern (e.g. rustup, Bun) and is often "
+        "legitimate — but it executes code you have not seen. Verify the URL and "
+        "the publisher you are trusting before letting an agent run it.",
+        category="notice",
     ),
     Rule(
         "RCE002",
-        "Pipe remote content to an interpreter (python/perl/ruby/node)",
-        Severity.CRITICAL,
+        "Runs remote content through an interpreter (python/perl/ruby/node)",
+        Severity.MEDIUM,
         _rx(r"(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(python3?|perl|ruby|node)\b"),
-        "Fetches and executes remote code through a language interpreter.",
+        "Fetches remote content and pipes it into a language interpreter. Common "
+        "for installers, but it runs unseen code — verify the source.",
+        category="notice",
     ),
     Rule(
         "RCE003",
@@ -108,25 +116,34 @@ RULES: list[Rule] = [
     ),
     Rule(
         "EXF002",
-        "Access to cloud credential files",
-        Severity.HIGH,
+        "Accesses cloud / cluster credential files",
+        Severity.MEDIUM,
         _rx(r"\.(aws/credentials|config/gcloud|azure)\b|\.kube/config"),
-        "Reads cloud provider credentials.",
+        "References cloud/cluster credential files. Legitimate for deployment and "
+        "infra skills, but confirm the credentials are only used locally and not "
+        "sent anywhere.",
+        category="notice",
     ),
     Rule(
         "EXF003",
-        "Reads environment for secrets/tokens/keys",
-        Severity.MEDIUM,
+        "Uses secret / token environment variables",
+        Severity.LOW,
         _rx(r"(os\.environ|process\.env|printenv|env\b)[^\n]{0,40}"
             r"(secret|token|api[_-]?key|password|passwd|credential)"),
-        "Harvests secrets from environment variables.",
+        "Reads secrets from environment variables. This is normal for any skill "
+        "that calls an authenticated API — surfaced so you know which secrets it "
+        "touches. Actual exfiltration (secret + outbound send) is flagged "
+        "separately as EXF005 / the capability gate.",
+        category="notice",
     ),
     Rule(
         "EXF004",
         "Reads dotenv / secret files",
-        Severity.MEDIUM,
+        Severity.LOW,
         _rx(r"(cat|read|open|less|more)\b[^\n]{0,60}(\.env\b|secrets?\.(json|ya?ml|txt))"),
-        "Reads local secret/dotenv files.",
+        "Reads local secret/dotenv files. Common for configuration; confirm the "
+        "contents are not forwarded externally.",
+        category="notice",
     ),
     Rule(
         "EXF005",
@@ -138,33 +155,50 @@ RULES: list[Rule] = [
         "Sends local/secret data to an external endpoint.",
     ),
     Rule(
+        "EXF007",
+        "Pipes environment/secrets into a network sender",
+        Severity.HIGH,
+        _rx(r"\b(env|printenv|cat\s+[^\n|]*(\.ssh|\.env|id_[a-z0-9]+|secret|token|"
+            r"credential)[^\n|]*)\b[^\n]*\|\s*[^\n]*\b(curl|wget|nc|ncat|netcat)\b"),
+        "Reads environment variables or secret files and pipes them straight into "
+        "a network tool — a direct data-exfiltration pattern.",
+    ),
+    Rule(
         "EXF006",
-        "Hardcoded external IP address with network call",
+        "Hardcoded public IP address",
         Severity.LOW,
         _rx(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
-        "Contains a raw IP address; verify it is not an exfiltration endpoint.",
+        "Contains a raw public IP address; verify it is not an exfiltration "
+        "endpoint. (Private/loopback ranges are ignored.)",
+        category="notice",
     ),
     # --- Persistence -----------------------------------------------------
     Rule(
         "PER001",
         "Modifies shell startup files",
-        Severity.HIGH,
+        Severity.MEDIUM,
         _rx(r">>?\s*~?/?\.(bashrc|zshrc|bash_profile|profile|zprofile)\b"),
-        "Writes to shell startup files to gain persistence.",
+        "Writes to shell startup files. Often used by installers to add a tool to "
+        "PATH, but it also persists across sessions — confirm what is written.",
+        category="notice",
     ),
     Rule(
         "PER002",
         "Installs a cron job or scheduled task",
-        Severity.HIGH,
+        Severity.MEDIUM,
         _rx(r"\b(crontab\s+-|/etc/cron|launchctl\s+load|schtasks\s+/create)\b"),
-        "Creates a scheduled task for persistence.",
+        "Creates a scheduled task. Legitimate for pollers/schedulers, but it lets "
+        "the skill run again later without you — confirm what it schedules.",
+        category="notice",
     ),
     Rule(
         "PER003",
         "Writes to system launch/service directories",
-        Severity.HIGH,
+        Severity.MEDIUM,
         _rx(r"/(Library/LaunchDaemons|Library/LaunchAgents|etc/systemd/system)/"),
-        "Installs a background service/daemon.",
+        "Installs a background service/daemon that runs persistently — confirm "
+        "this is expected.",
+        category="notice",
     ),
     # --- Obfuscation -----------------------------------------------------
     Rule(
@@ -225,8 +259,10 @@ RULES: list[Rule] = [
         "INJ005",
         "Escalation / silent auto-approval instruction",
         Severity.MEDIUM,
-        _rx(r"(auto[-\s]?approve|without\s+(asking|confirmation|permission)|"
-            r"skip\s+(the\s+)?confirmation)"),
+        # Note: bare "without permission" was removed — it fired on legitimate
+        # negated guidance ("don't do X without permission").
+        _rx(r"(auto[-\s]?approve|without\s+(asking|confirmation)|"
+            r"skip\s+(the\s+)?confirmation|bypass\s+confirmation)"),
         "Tries to make the agent act without user confirmation.",
     ),
     # --- Network / reverse shells ----------------------------------------
@@ -234,7 +270,7 @@ RULES: list[Rule] = [
         "NET001",
         "Reverse shell via netcat/bash",
         Severity.CRITICAL,
-        _rx(r"(nc|ncat|netcat)\b[^\n]{0,40}(-e|/bin/(ba)?sh)|"
+        _rx(r"\b(nc|ncat|netcat)\s+[^\n]{0,40}(-e\b|/bin/(ba)?sh)|"
             r"/dev/tcp/\d|bash\s+-i\s+>&"),
         "Opens a reverse shell to a remote host.",
     ),
@@ -249,9 +285,11 @@ RULES: list[Rule] = [
     Rule(
         "PRV001",
         "chmod 777 / world-writable or setuid",
-        Severity.MEDIUM,
+        Severity.LOW,
         _rx(r"chmod\s+([0-7]?7{3}|[+]s|u\+s)\b"),
-        "Sets overly-permissive or setuid permissions.",
+        "Sets overly-permissive or setuid permissions — often sloppy rather than "
+        "malicious, but worth tightening.",
+        category="notice",
     ),
     Rule(
         "PRV002",
@@ -272,14 +310,36 @@ _HIDDEN_CATEGORIES = {"Cf"}  # format chars: zero-width space, joiners, bidi, et
 _HIDDEN_ALLOWED = {"\ufeff"}  # BOM at start is common/benign; still low-signal
 
 
+def _is_emoji_char(ch: str | None) -> bool:
+    """True if ``ch`` is an emoji / pictographic that legitimately uses ZWJ."""
+    if not ch:
+        return False
+    o = ord(ch)
+    return (
+        0x1F000 <= o <= 0x1FAFF  # pictographs, emoji, symbols
+        or 0x2600 <= o <= 0x27BF  # misc symbols + dingbats
+        or o in (0xFE0F, 0x2764)  # variation selector-16, heart
+        or 0x1F1E6 <= o <= 0x1F1FF  # regional indicators (flags)
+    )
+
+
 def _scan_hidden_unicode(sf: SkillFile) -> list[Finding]:
     findings: list[Finding] = []
     for lineno, line in enumerate(sf.content.splitlines(), start=1):
-        hidden = [
-            ch
-            for ch in line
-            if unicodedata.category(ch) in _HIDDEN_CATEGORIES and ch not in _HIDDEN_ALLOWED
-        ]
+        hidden = []
+        for i, ch in enumerate(line):
+            if unicodedata.category(ch) not in _HIDDEN_CATEGORIES:
+                continue
+            if ch in _HIDDEN_ALLOWED:
+                continue
+            # A zero-width joiner between two emoji is a normal emoji sequence
+            # (e.g. 👩‍💻), not a hidden-text attack — skip it.
+            if ch == "\u200d":
+                prev = line[i - 1] if i > 0 else None
+                nxt = line[i + 1] if i + 1 < len(line) else None
+                if _is_emoji_char(prev) or _is_emoji_char(nxt):
+                    continue
+            hidden.append(ch)
         if hidden:
             names = ", ".join(sorted({unicodedata.name(c, f"U+{ord(c):04X}") for c in hidden}))
             findings.append(
@@ -309,6 +369,28 @@ def _line_of(content: str, index: int) -> int:
     return content.count("\n", 0, index) + 1
 
 
+def _is_private_ip(text: str) -> bool:
+    """True for private / loopback / link-local / reserved IPv4 addresses."""
+    import ipaddress
+    import re as _re
+
+    m = _re.search(r"(?:\d{1,3}\.){3}\d{1,3}", text)
+    if not m:
+        return False
+    try:
+        ip = ipaddress.ip_address(m.group(0))
+    except ValueError:
+        return True  # not a valid IP → not a real endpoint
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_reserved
+        or ip.is_unspecified
+        or ip.is_multicast
+    )
+
+
 def run_rules(skill: SkillInput) -> list[Finding]:
     """Run all static rules over every file in the skill."""
     findings: list[Finding] = []
@@ -321,6 +403,10 @@ def run_rules(skill: SkillInput) -> list[Finding]:
         for rule in applicable:
             for m in rule.pattern.finditer(sf.content):
                 excerpt = m.group(0)
+                # EXF006: ignore private / loopback / reserved IPs — they are not
+                # exfiltration endpoints and produce heavy false positives.
+                if rule.rule_id == "EXF006" and _is_private_ip(excerpt):
+                    continue
                 # Trim very long matches (e.g. base64 blobs) for readability.
                 if len(excerpt) > 120:
                     excerpt = excerpt[:117] + "..."
@@ -331,6 +417,7 @@ def run_rules(skill: SkillInput) -> list[Finding]:
                         severity=rule.severity,
                         detail=rule.detail,
                         source="static",
+                        category=rule.category,
                         file=sf.path,
                         line=_line_of(sf.content, m.start()),
                         excerpt=excerpt,

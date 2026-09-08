@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-08
+
+### Added
+- **Awareness notices** — a new finding category (`threat` vs `notice`).
+  Legitimate-but-notable behaviors (running an install script, using a secret
+  env var, scheduling a task, touching cloud-credential files) are now surfaced
+  loudly in a dedicated "Heads up" section of the CV / report, but **never**
+  make a Skill `suspicious` or `malicious` on their own. Verdicts are driven by
+  genuine threats and the capability gate.
+- `scripts/scan_corpus.py` — reproducible harness to scan public `SKILL.md`
+  files at scale and aggregate results.
+- `EXF007` — detects piping environment variables / secret files straight into
+  a network sender (a real data-exfiltration pattern).
+
+### Changed
+- Reclassified as awareness notices (no longer verdict-driving threats):
+  `RCE001`/`RCE002` (curl|sh install scripts), `EXF002`/`EXF003`/`EXF004`
+  (credential/secret file & env-var use), `EXF006` (hardcoded IP),
+  `PER001`/`PER002`/`PER003` (persistence), `PRV001` (permissions).
+
+### Fixed
+- `EXF006` no longer flags private / loopback / reserved IP addresses.
+- `OBF004` no longer flags the zero-width joiner inside emoji (e.g. 👩‍💻).
+- `NET001` no longer false-matches `nc` inside words like `sync --extra`.
+- `INJ005` no longer fires on negated guidance ("don't do X without permission").
+
 ## [0.3.1] - 2026-09-08
 
 ### Fixed
@@ -58,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release: hybrid static + LLM validation engine, CLI, and rule set.
 
-[Unreleased]: https://github.com/WaelAbouceo/vouch/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/WaelAbouceo/vouch/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/WaelAbouceo/vouch/releases/tag/v0.4.0
 [0.3.1]: https://github.com/WaelAbouceo/vouch/releases/tag/v0.3.1
 [0.3.0]: https://github.com/WaelAbouceo/vouch/releases/tag/v0.3.0
 [0.2.0]: https://github.com/WaelAbouceo/vouch/releases/tag/v0.2.0

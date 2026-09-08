@@ -209,8 +209,12 @@ class Engine:
                 findings = findings + llm_result.findings
                 summary_override = llm_result.summary
 
-        score = self._score(findings)
-        verdict = self._verdict(score, findings)
+        # Only genuine threats drive the score/verdict. Awareness notices
+        # (install scripts, secret env vars, scheduled tasks, ...) are surfaced
+        # but never make a skill suspicious or malicious on their own.
+        threats = [f for f in findings if f.category != "notice"]
+        score = self._score(threats)
+        verdict = self._verdict(score, threats)
 
         # -- capability gate -------------------------------------------
         # A dangerous capability combination cannot yield a clean 'valid' from a
@@ -226,7 +230,10 @@ class Engine:
                 if verdict == Verdict.VALID:
                     verdict = Verdict.SUSPICIOUS
 
-        summary = self._summarize(verdict, findings, llm_used, review_required)
+        summary = self._summarize(verdict, threats, llm_used, review_required)
+        n_notices = sum(1 for f in findings if f.category == "notice")
+        if n_notices:
+            summary += f" {n_notices} awareness notice(s) — see 'heads up'."
         if summary_override:
             summary = f"{summary} LLM: {summary_override}"
 

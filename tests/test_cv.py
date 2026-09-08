@@ -45,7 +45,9 @@ def test_malicious_cv_flags_capabilities_and_verdict():
     present = {c.key for c in cv.capabilities if c.present}
     assert "network" in present
     assert "credentials" in present
-    assert cv.findings_by_severity["critical"] >= 1
+    # The verdict is driven by real threats (SSH-key access, exfil, injection),
+    # not by awareness notices like the install script.
+    assert len(cv.report.threats) >= 1
 
 
 def test_renderers_produce_output():

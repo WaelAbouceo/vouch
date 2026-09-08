@@ -58,13 +58,11 @@ def _render(report: Report, color: bool) -> str:
         lines.append(_c(warn, "\033[33m", color))
         for reason in report.review_reasons:
             lines.append(f"         - {reason}")
-    if report.findings:
+    threats = report.threats
+    if threats:
         lines.append("")
-        lines.append(f"Findings ({len(report.findings)}):")
-        ordered = sorted(
-            report.findings, key=lambda f: f.severity.weight, reverse=True
-        )
-        for f in ordered:
+        lines.append(f"Threats ({len(threats)}):")
+        for f in sorted(threats, key=lambda f: f.severity.weight, reverse=True):
             loc = ""
             if f.file:
                 loc = f" [{f.file}" + (f":{f.line}" if f.line else "") + "]"
@@ -73,6 +71,17 @@ def _render(report: Report, color: bool) -> str:
             lines.append(f"           {f.detail}")
             if f.excerpt:
                 lines.append(f"           > {f.excerpt}")
+
+    notices = report.notices
+    if notices:
+        lines.append("")
+        heads_up = "Heads up — legitimate but worth knowing:"
+        lines.append(_c(heads_up, "\033[36m", color))
+        for f in sorted(notices, key=lambda f: f.severity.weight, reverse=True):
+            loc = ""
+            if f.file:
+                loc = f" [{f.file}" + (f":{f.line}" if f.line else "") + "]"
+            lines.append(f"  • {f.rule_id}: {f.title}{loc}")
     return "\n".join(lines)
 
 
