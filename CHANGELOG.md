@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-09
+
+### Added
+- `DES004` — recursive delete of the **home/root** directory in Python
+  (`shutil.rmtree(expanduser("~"))`, `Path.home()`, `"/"`). Scoped to the root
+  target so legitimate cache/temp cleanup (`rmtree("~/.cache/app")`) is not
+  flagged.
+- `DES005` — **list-argument `rm -rf`** of home/root
+  (`subprocess.run(["rm","-rf","/"])`), which never spells the literal `rm -rf /`
+  string and so slipped past `DES001`. Also scoped to root/home targets.
+
+### Fixed
+- **Binary files are no longer scanned as text.** Pointing Vouch at an office
+  document (`.docx`/`.pptx`/`.xlsx` — really zip archives) used to decode its
+  bytes as text and could spuriously match rules on URLs/fragments buried in the
+  file. The loader now detects binary content (NUL bytes) and records such files
+  by name only. Text/code files are unaffected.
+
+### Changed
+- **Honest `--fail-on` story.** With the default (`--fail-on malicious`),
+  `suspicious`/review findings (capability gate, prose exfil `EXF009`, LLM
+  concerns) never failed the build — silently. Vouch now prints a **note**
+  whenever a `suspicious`/review result exits 0 under the default, telling you to
+  pass `--fail-on suspicious` to block review items in CI. Exit codes are
+  unchanged; the nudge only appears when you're on the default (not when you
+  chose a policy explicitly). Help text spells out the relationship.
+
 ### CI
 - New `install-slim` job: builds the wheel and installs it **from scratch with
   all extras in a fresh `python:3.12-slim` container**, then verifies imports

@@ -71,6 +71,45 @@ def test_exf009_makes_prose_exfil_fail_ci():
     assert "EXF009" in {f.rule_id for f in r.threats}
 
 
+# --- destructive Python / list-arg rm (previously missed) ------------------
+
+def _scan_code(code, path="run.py"):
+    from vouch.engine import validate_skill
+    from vouch.models import SkillFile, SkillInput
+    s = SkillInput(name="t", files=[SkillFile(path=path, content=code)], source="directory")
+    return validate_skill(s, use_llm=False)
+
+
+def test_des004_catches_rmtree_of_home():
+    for code in (
+        "import shutil, os\nshutil.rmtree(os.path.expanduser('~'))\n",
+        "import shutil\nfrom pathlib import Path\nshutil.rmtree(Path.home())\n",
+        "import shutil\nshutil.rmtree('/')\n",
+    ):
+        r = _scan_code(code)
+        assert "DES004" in {f.rule_id for f in r.threats}, code
+
+
+def test_des004_ignores_cache_subdir_cleanup():
+    # Deleting a cache SUBDIRECTORY is legitimate and must not be flagged.
+    r = _scan_code("import shutil, os\nshutil.rmtree(os.path.expanduser('~/.cache/app'))\n")
+    assert "DES004" not in {f.rule_id for f in r.threats}
+
+
+def test_des005_catches_list_arg_rm_of_home_or_root():
+    for code in (
+        "import subprocess, os\nsubprocess.run(['rm','-rf', os.path.expanduser('~')])\n",
+        "import subprocess\nsubprocess.run(['rm','-rf','/'])\n",
+    ):
+        r = _scan_code(code)
+        assert "DES005" in {f.rule_id for f in r.threats}, code
+
+
+def test_des005_ignores_list_arg_rm_of_tempdir():
+    r = _scan_code("import subprocess\nsubprocess.run(['rm','-rf','/tmp/build'])\n")
+    assert "DES005" not in {f.rule_id for f in r.threats}
+
+
 def test_obf005_fires_on_variable_assembled_command():
     findings = _findings_for('A="r"; B="m"; C="-rf"\n$A$B $C "$HOME"/')
     obf = [f for f in findings if f.rule_id == "OBF005"]

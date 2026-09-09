@@ -249,7 +249,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.8.1
+    rev: v0.9.0
     hooks:
       - id: vouch
 ```

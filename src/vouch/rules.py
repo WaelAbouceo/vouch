@@ -25,7 +25,7 @@ from .models import Finding, Severity, SkillFile, SkillInput
 # precisely as prose, so they always count regardless of context.
 _EXEC_CONTEXT_RULES = frozenset({
     "RCE003", "RCE004", "RCE005",
-    "DES001", "DES002", "DES003",
+    "DES001", "DES002", "DES003", "DES004", "DES005",
     "EXF001", "EXF005", "EXF007",
     "OBF003", "OBF005",
     "NET001",
@@ -132,6 +132,36 @@ RULES: list[Rule] = [
         Severity.HIGH,
         _rx(r":\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"),
         "Classic shell fork bomb that exhausts system resources.",
+    ),
+    Rule(
+        "DES004",
+        "Recursive delete of the home/root directory (Python)",
+        Severity.CRITICAL,
+        # shutil.rmtree pointed at the home ROOT or filesystem root. Scoped to the
+        # exact root target so legitimate cache cleanup like
+        # rmtree(expanduser("~/.cache/app")) is NOT flagged.
+        _rx(r"\bshutil\.rmtree\s*\(\s*("
+            r"os\.path\.expanduser\(\s*[\"']~[\"']\s*\)|"
+            r"(?:pathlib\.)?Path\.home\(\)|"
+            r"os\.environ\[\s*[\"']HOME[\"']\s*\]|"
+            r"[\"'](?:/|~|~/)[\"'])"),
+        "Recursively deletes the user's entire home directory or the filesystem "
+        "root via shutil.rmtree — the Python equivalent of `rm -rf ~`.",
+    ),
+    Rule(
+        "DES005",
+        "Recursive force delete of home/root via argument list",
+        Severity.CRITICAL,
+        # `subprocess.run(["rm", "-rf", "/"])` — list-form rm that never spells
+        # out the literal "rm -rf /" string, so DES001 misses it. Scoped to
+        # root/home targets so deleting a temp dir isn't flagged.
+        _rx(r"[\"']rm[\"']\s*,\s*[\"']-[a-z]*[rf][a-z]*[\"'][^\n\]]{0,80}"
+            r"(os\.path\.expanduser\(\s*[\"']~[\"']|"
+            r"(?:pathlib\.)?Path\.home\(\)|"
+            r"os\.environ\[\s*[\"']HOME[\"']\s*\]|"
+            r"[\"'](?:/|~|~/)[\"'])"),
+        "Builds an `rm -rf` command from an argument list that targets the home or "
+        "root directory — a destructive wipe hidden from string-based scanners.",
     ),
     # --- Credential / secret access & exfiltration -----------------------
     Rule(

@@ -51,6 +51,33 @@ def _c(text: str, color: str, enabled: bool) -> str:
     return f"{color}{text}{_RESET}" if enabled else text
 
 
+def _exit_for(verdict: Verdict, fail_on: str | None) -> int:
+    """Map a verdict to an exit code. ``None`` fail_on behaves like 'malicious'."""
+    fo = fail_on or "malicious"
+    if fo == "never":
+        return 0
+    if fo == "suspicious":
+        return 0 if verdict == Verdict.VALID else _EXIT[verdict]
+    return 2 if verdict == Verdict.MALICIOUS else 0
+
+
+def _fail_on_notice(verdict: Verdict, review_required: bool, fail_on: str | None) -> None:
+    """Tell the user when a review-worthy result silently passed CI by default.
+
+    Only nudges when the user is on the default (didn't pass --fail-on), so it
+    never nags someone who explicitly chose a policy.
+    """
+    if fail_on is not None:
+        return
+    if verdict == Verdict.SUSPICIOUS or review_required:
+        print(
+            "note: this result is SUSPICIOUS / flagged for review, but the run "
+            "exited 0 because --fail-on defaults to 'malicious'. Pass "
+            "--fail-on suspicious to block review items in CI.",
+            file=sys.stderr,
+        )
+
+
 def _warn_llm(report: Report) -> None:
     """Print an honest stderr warning if a requested AI review didn't fully run."""
     if report.llm_status == "unavailable":
@@ -234,8 +261,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--fail-on",
         choices=["suspicious", "malicious", "never"],
-        default="malicious",
-        help="Verdict level that yields a non-zero exit code (default: malicious).",
+        default=None,
+        help="Verdict level that yields a non-zero exit code (default: malicious). "
+        "NOTE: with the default, 'suspicious'/review findings (capability gate, "
+        "prose exfil, LLM concerns) do NOT fail the build — use --fail-on "
+        "suspicious to block those in CI.",
     )
     return p
 
@@ -358,11 +388,9 @@ def main(argv: list[str] | None = None) -> int:
             audit_mod.save_baseline(machine, baseline_path)
 
         worst = audit_mod._worst(machine)
-        if args.fail_on == "never":
-            return 0
-        if args.fail_on == "suspicious":
-            return 0 if worst == Verdict.VALID else _EXIT[worst]
-        return 2 if worst == Verdict.MALICIOUS else 0
+        worst_review = any(e.review_required for e in machine.flagged)
+        _fail_on_notice(worst, worst_review, args.fail_on)
+        return _exit_for(worst, args.fail_on)
 
     # Agent CV: aggregate every skill under the target directory.
     if args.agent_cv:
@@ -386,11 +414,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(agent_mod.render_text(agent_cv, color=color))
         verdict = agent_cv.verdict
-        if args.fail_on == "never":
-            return 0
-        if args.fail_on == "suspicious":
-            return 0 if verdict == Verdict.VALID else _EXIT[verdict]
-        return 2 if verdict == Verdict.MALICIOUS else 0
+        _fail_on_notice(verdict, False, args.fail_on)
+        return _exit_for(verdict, args.fail_on)
 
     if args.target is None:
         print(
@@ -435,13 +460,8 @@ def main(argv: list[str] | None = None) -> int:
     # layer was asked for but didn't fully do its job — never let the tool imply
     # "an AI reviewed this" when it didn't.
     _warn_llm(report)
-
-    if args.fail_on == "never":
-        return 0
-    if args.fail_on == "suspicious":
-        return 0 if report.verdict == Verdict.VALID else _EXIT[report.verdict]
-    # fail-on malicious
-    return 2 if report.verdict == Verdict.MALICIOUS else 0
+    _fail_on_notice(report.verdict, report.review_required, args.fail_on)
+    return _exit_for(report.verdict, args.fail_on)
 
 
 if __name__ == "__main__":  # pragma: no cover
