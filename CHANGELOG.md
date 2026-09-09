@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`DES006`** — flags recursive force-delete of Windows user profile or drive root via PowerShell (`Remove-Item -Recurse -Force`) or cmd (`del /f /s /q`, `rd /s /q`). Scoped to root and profile targets so deleting subdirectories like `.\build` is not flagged.
+
 ## [0.10.0] - 2026-09-09
 
 Addresses first external-tester feedback.

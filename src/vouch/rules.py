@@ -25,7 +25,7 @@ from .models import Finding, Severity, SkillFile, SkillInput
 # precisely as prose, so they always count regardless of context.
 _EXEC_CONTEXT_RULES = frozenset({
     "RCE003", "RCE004", "RCE005",
-    "DES001", "DES002", "DES003", "DES004", "DES005",
+    "DES001", "DES002", "DES003", "DES004", "DES005", "DES006",
     "EXF001", "EXF005", "EXF007",
     "OBF003", "OBF005",
     "NET001",
@@ -183,6 +183,34 @@ RULES: list[Rule] = [
             r"[\"'](?:/|~|~/)[\"'])"),
         "Builds an `rm -rf` command from an argument list that targets the home or "
         "root directory — a destructive wipe hidden from string-based scanners.",
+    ),
+    Rule(
+        "DES006",
+        "Recursive force delete of Windows user profile or drive root",
+        Severity.CRITICAL,
+        # PowerShell Remove-Item (-Recurse & -Force) or CMD del (/s & /q|/f) / rd (/s & /q)
+        # targeting the user profile or drive root. Scoped so deleting subdirectories
+        # like .\build or %USERPROFILE%\temp is NOT flagged.
+        _rx(
+            r"(?:"
+            r"\bRemove-Item\b"
+            r"(?=[^\n;&|]*\s+-r(?:ecurse)?\b)"
+            r"(?=[^\n;&|]*\s+-f(?:orce)?\b)"
+            r"[^\n;&|]*\s+[\"']?(?:\$HOME|\$(?:env:)?USERPROFILE|\$\{env:USERPROFILE\}|%USERPROFILE%|%HOMEPATH%|~|[a-zA-Z]:)(?:[\\/]+(?:\*(?:\.\*)?)?)?[\"']?(?=[\s;&|\)]|$)"
+            r"|"
+            r"\b(?:del|erase)\b"
+            r"(?=[^\n;&|]*[\s/][a-z0-9]*s)"
+            r"(?=[^\n;&|]*[\s/][a-z0-9]*[fq])"
+            r"[^\n;&|]*\s+[\"']?(?:\$HOME|\$(?:env:)?USERPROFILE|\$\{env:USERPROFILE\}|%USERPROFILE%|%HOMEPATH%|~|[a-zA-Z]:)(?:[\\/]+(?:\*(?:\.\*)?)?)?[\"']?(?=[\s;&|\)]|$)"
+            r"|"
+            r"\b(?:rd|rmdir)\b"
+            r"(?=[^\n;&|]*[\s/][a-z0-9]*s)"
+            r"(?=[^\n;&|]*[\s/][a-z0-9]*q)"
+            r"[^\n;&|]*\s+[\"']?(?:\$HOME|\$(?:env:)?USERPROFILE|\$\{env:USERPROFILE\}|%USERPROFILE%|%HOMEPATH%|~|[a-zA-Z]:)(?:[\\/]+(?:\*(?:\.\*)?)?)?[\"']?(?=[\s;&|\)]|$)"
+            r")"
+        ),
+        "Recursively and forcefully deletes files from a Windows user profile or "
+        "drive root via PowerShell or cmd.",
     ),
     # --- Credential / secret access & exfiltration -----------------------
     Rule(
