@@ -23,6 +23,41 @@ jobs:
       - name: Test
         run: pytest -q
 
+  install-slim:
+    # Verify the built wheel actually INSTALLS cleanly from scratch — including
+    # every optional extra — in a fresh Debian-based image. A post-hoc `pip
+    # check` doesn't prove the install itself succeeds (e.g. the mcp SDK needs a
+    # newer PyJWT), so we do a real, from-zero install in python:3.12-slim.
+    runs-on: ubuntu-latest
+    container: python:3.12-slim
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build wheel
+        run: |
+          python -m pip install --quiet build
+          python -m build --wheel
+      - name: Install wheel with all extras (fresh, no editable, no cache)
+        run: |
+          WHEEL="$(ls dist/*.whl)"
+          echo "Installing ${WHEEL}[all]"
+          python -m pip install --no-cache-dir "${WHEEL}[all]"
+      - name: Verify imports + dependency consistency
+        run: |
+          python - <<'PY'
+          import vouch
+          import fastapi, mcp, openai  # extras
+          from mcp.server.fastmcp import FastMCP  # v1 API (mcp<2 pin)
+          import jwt  # mcp's PyJWT dep must resolve
+          print("vouch", vouch.__version__, "| mcp OK | PyJWT", jwt.__version__)
+          PY
+          python -m pip check
+      - name: Entrypoints import and build
+        run: |
+          vouch --version
+          # Don't launch vouch-api (it blocks); just verify the app constructs.
+          python -c "from vouch.api import create_app; create_app(); print('http app builds')"
+          python -c "from vouch.mcp_server import build_server; build_server(); print('mcp server builds')"
+
   self-scan:
     # Dogfood: the validator scans its own example skills.
     runs-on: ubuntu-latest

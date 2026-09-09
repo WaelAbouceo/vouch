@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI
+- New `install-slim` job: builds the wheel and installs it **from scratch with
+  all extras in a fresh `python:3.12-slim` container**, then verifies imports
+  (incl. `mcp`/`PyJWT`), `pip check`, and that the CLI/HTTP/MCP entrypoints
+  construct. Catches real install-time failures that a post-hoc `pip check`
+  can't.
+
 ## [0.8.1] - 2026-09-09
 
 ### Security
