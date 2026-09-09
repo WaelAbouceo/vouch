@@ -31,7 +31,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .models import Finding, Severity, SkillInput
+from .models import Finding, Severity, SkillFile, SkillInput
 
 # Per-backend default models.
 _CURSOR_DEFAULT_MODEL = "composer-2.5"
@@ -74,7 +74,16 @@ _SYSTEM = (
     "}"
 )
 
-_MAX_CHARS = 24_000  # keep the prompt bounded
+_MAX_CHARS = 24_000  # total prompt budget
+_PER_FILE_CHARS = 8_000  # so one big file can't starve all the others
+
+# Extensions that most often carry the actual executable payload. These are
+# shown to the LLM FIRST, so on a large skill the risky script isn't the file
+# that gets truncated away.
+_SCRIPT_EXTS = (
+    ".sh", ".bash", ".zsh", ".fish", ".py", ".js", ".mjs", ".cjs", ".ts",
+    ".rb", ".pl", ".php", ".ps1", ".bat", ".cmd", ".lua", ".r",
+)
 
 # A responder maps (system_prompt, user_prompt) -> raw model text (or None).
 Responder = Callable[[str, str], "str | None"]
@@ -87,6 +96,8 @@ class LLMResult:
     summary: str
     findings: list[Finding]
     provider: str = "unknown"
+    # How much of the skill the model actually saw (set by analyze_with_llm).
+    coverage: dict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -166,21 +177,66 @@ def is_available(api_key: str | None = None) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _build_prompt(skill: SkillInput) -> str:
+def _file_rank(f: SkillFile) -> int:
+    """Order files so the LLM sees likely-executable payloads first."""
+    path = f.path.lower()
+    if path.endswith(_SCRIPT_EXTS):
+        return 0  # scripts: most likely to carry the real payload
+    if path.endswith("skill.md"):
+        return 1  # the instructions the agent will follow
+    if path.endswith((".md", ".markdown", ".txt", ".rst")):
+        return 3  # prose/docs: least likely to hide executable risk
+    return 2
+
+
+def _build_prompt(skill: SkillInput) -> tuple[str, dict]:
+    """Build the audit prompt and report how much of the skill it covers.
+
+    Files are ordered risky-first and each is capped so one large file can't
+    consume the whole budget and hide later files from the model. The returned
+    coverage dict lets callers be honest about partial reviews.
+    """
+    files_total = len(skill.files)
+    chars_total = sum(len(f.content) for f in skill.files)
+    ordered = sorted(skill.files, key=_file_rank)
+
     parts = [f"# Skill under review: {skill.name}\n"]
     budget = _MAX_CHARS
-    for f in skill.files:
+    files_seen = 0
+    chars_seen = 0
+    truncated = False
+
+    for f in ordered:
+        if budget <= 0:
+            truncated = True
+            break
         header = f"\n## FILE: {f.path}\n"
+        cap = min(_PER_FILE_CHARS, budget)
         chunk = f.content
-        if len(chunk) > budget:
-            chunk = chunk[:budget] + "\n<...truncated...>"
+        if len(chunk) > cap:
+            chunk = chunk[:cap] + "\n<...file truncated...>"
+            truncated = True
         parts.append(header)
         parts.append("```\n" + chunk + "\n```")
         budget -= len(chunk) + len(header)
-        if budget <= 0:
-            parts.append("\n<...remaining files truncated...>")
-            break
-    return "".join(parts)
+        files_seen += 1
+        chars_seen += min(len(f.content), cap)
+
+    if files_seen < files_total:
+        truncated = True
+        parts.append(
+            f"\n<...{files_total - files_seen} more file(s) not shown to the "
+            "auditor...>"
+        )
+
+    coverage = {
+        "files_seen": files_seen,
+        "files_total": files_total,
+        "chars_seen": chars_seen,
+        "chars_total": chars_total,
+        "truncated": truncated,
+    }
+    return "".join(parts), coverage
 
 
 def _extract_json(text: str) -> dict | None:
@@ -348,24 +404,28 @@ def analyze_with_llm(
     ``responder`` (a callable ``(system, prompt) -> raw_text``) bypasses the
     built-in backends entirely — useful for tests or custom integrations.
     """
-    prompt = _build_prompt(skill)
+    prompt, coverage = _build_prompt(skill)
+
+    def _finish(raw: str | None, prov: str) -> LLMResult | None:
+        res = _parse(raw, provider=prov) if raw else None
+        if res is not None:
+            res.coverage = coverage
+        return res
 
     if responder is not None:
         try:
             raw = responder(_SYSTEM, prompt)
         except Exception:
             return None
-        return _parse(raw, provider="custom") if raw else None
+        return _finish(raw, "custom")
 
     chosen = provider or available_provider(api_key)
     if chosen == "seg":
         key = _seg_key(api_key) or ""
-        raw = _call_seg(_SYSTEM, prompt, model, key)
-        return _parse(raw, provider="seg") if raw else None
+        return _finish(_call_seg(_SYSTEM, prompt, model, key), "seg")
     if chosen == "cursor":
         key = api_key or os.environ.get("CURSOR_API_KEY") or ""
-        raw = _call_cursor(_SYSTEM, prompt, model, key)
-        return _parse(raw, provider="cursor") if raw else None
+        return _finish(_call_cursor(_SYSTEM, prompt, model, key), "cursor")
     if chosen == "openai":
         key = (
             api_key
@@ -373,6 +433,5 @@ def analyze_with_llm(
             or os.environ.get("VOUCH_LLM_API_KEY")
             or ""
         )
-        raw = _call_openai(_SYSTEM, prompt, model, key)
-        return _parse(raw, provider="openai") if raw else None
+        return _finish(_call_openai(_SYSTEM, prompt, model, key), "openai")
     return None

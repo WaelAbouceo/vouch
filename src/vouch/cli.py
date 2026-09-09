@@ -51,6 +51,32 @@ def _c(text: str, color: str, enabled: bool) -> str:
     return f"{color}{text}{_RESET}" if enabled else text
 
 
+def _warn_llm(report: Report) -> None:
+    """Print an honest stderr warning if a requested AI review didn't fully run."""
+    if report.llm_status == "unavailable":
+        print(
+            "warning: --llm was requested but no AI backend ran (no API key or "
+            "provider unreachable); showing static-only results. Set "
+            "OPENAI_API_KEY / SEG_API_KEY / CURSOR_API_KEY to enable it.",
+            file=sys.stderr,
+        )
+    elif report.llm_status == "failed":
+        print(
+            "warning: --llm was requested but the AI backend call failed; "
+            "showing static-only results.",
+            file=sys.stderr,
+        )
+    elif report.llm_status == "used" and report.llm_coverage:
+        cov = report.llm_coverage
+        if cov.get("truncated"):
+            print(
+                f"note: the AI reviewed only {cov.get('files_seen', 0)}/"
+                f"{cov.get('files_total', 0)} file(s) — the skill exceeded the "
+                "prompt budget, so its review is partial.",
+                file=sys.stderr,
+            )
+
+
 def _render(report: Report, color: bool) -> str:
     lines: list[str] = []
     v = report.verdict
@@ -60,6 +86,28 @@ def _render(report: Report, color: bool) -> str:
     )
     lines.append(f"Skill:   {report.skill_name}")
     lines.append(f"Engine:  {report.engine} (llm_used={report.llm_used})")
+    # Be honest about what the AI layer actually did.
+    if report.llm_status == "unavailable":
+        lines.append(_c(
+            "⚠ AI review was requested but NO backend ran (no API key / provider "
+            "unreachable) — results below are static-only.",
+            "\033[33m", color,
+        ))
+    elif report.llm_status == "failed":
+        lines.append(_c(
+            "⚠ AI review was requested but the backend call FAILED — results below "
+            "are static-only.",
+            "\033[33m", color,
+        ))
+    elif report.llm_status == "used" and report.llm_coverage:
+        cov = report.llm_coverage
+        if cov.get("truncated"):
+            seen, total = cov.get("files_seen", 0), cov.get("files_total", 0)
+            lines.append(_c(
+                f"⚠ AI saw only {seen}/{total} file(s) — the skill was too large to "
+                "show in full, so the AI review is partial.",
+                "\033[33m", color,
+            ))
     if report.capabilities:
         lines.append(f"Caps:    {', '.join(report.capabilities)}")
     lines.append(f"Summary: {report.summary}")
@@ -159,7 +207,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable the LLM auditor (static analysis only).",
     )
-    p.add_argument("--llm", action="store_true", help="Force-enable the LLM auditor.")
+    p.add_argument(
+        "--llm",
+        action="store_true",
+        help="Force-enable the AI auditor. NOTE: this sends the skill's contents "
+        "to the configured LLM provider. Static analysis stays fully local.",
+    )
     p.add_argument(
         "--sign-off",
         action="store_true",
@@ -215,6 +268,19 @@ def main(argv: list[str] | None = None) -> int:
         # LLM just because a key is configured — that would silently make N slow
         # network calls. The LLM runs only when explicitly requested with --llm.
         audit_use_llm = bool(args.llm)
+
+        # Fail loudly (not silently) if --llm was asked for but nothing can run it.
+        if audit_use_llm:
+            from . import llm as _llm
+
+            if not _llm.is_available():
+                print(
+                    "warning: --llm was requested but no AI backend is configured "
+                    "or reachable; auditing with static analysis only. Set "
+                    "OPENAI_API_KEY / SEG_API_KEY / CURSOR_API_KEY to enable it.",
+                    file=sys.stderr,
+                )
+                audit_use_llm = False
 
         progress = None
         if audit_use_llm:
@@ -364,6 +430,11 @@ def main(argv: list[str] | None = None) -> int:
             print(report.to_json())
         else:
             print(_render(report, color))
+
+    # Warn on stderr (so JSON/markdown/CV output stays clean) whenever the AI
+    # layer was asked for but didn't fully do its job — never let the tool imply
+    # "an AI reviewed this" when it didn't.
+    _warn_llm(report)
 
     if args.fail_on == "never":
         return 0

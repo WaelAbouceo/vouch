@@ -209,6 +209,8 @@ class Engine:
             )
 
         llm_verdict: Verdict | None = None
+        llm_status = "off"
+        llm_coverage: dict | None = None
         if self.use_llm:
             from . import llm  # imported lazily to keep base install light
 
@@ -220,10 +222,18 @@ class Engine:
             )
             if llm_result is not None:
                 llm_used = True
+                llm_status = "used"
                 engine_name = "hybrid"
+                llm_coverage = llm_result.coverage
                 findings = findings + llm_result.findings
                 summary_override = llm_result.summary
                 llm_verdict = _STR_TO_VERDICT.get(llm_result.verdict)
+            else:
+                # Requested but nothing ran. Be honest instead of silently
+                # returning static-only results dressed up as a review.
+                llm_status = (
+                    "unavailable" if not llm.is_available(self.api_key) else "failed"
+                )
 
         # Only *deterministic* threats (static rules) drive the score and are the
         # ONLY thing that can yield a 'malicious' verdict. Awareness notices,
@@ -296,6 +306,8 @@ class Engine:
             summary=summary,
             engine=engine_name,
             llm_used=llm_used,
+            llm_status=llm_status,
+            llm_coverage=llm_coverage,
             capabilities=cap_labels,
             review_required=review_required,
             review_reasons=review_reasons,

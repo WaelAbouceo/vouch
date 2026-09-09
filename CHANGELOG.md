@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-09
+
+### Fixed
+- **The AI layer no longer fails silently.** If you pass `--llm` but no backend
+  is configured or the call errors, Vouch now prints a **warning** and reports
+  `llm_status` = `unavailable`/`failed` instead of quietly returning static-only
+  results dressed up as an AI review. `--audit --llm` warns up front too.
+- **Partial AI reviews are now disclosed.** Big skills used to exceed the prompt
+  budget so the model saw only the first few files — yet the tool still implied a
+  full review. The report now shows exactly how much the AI saw
+  ("AI saw only 4/51 files…") and exposes `llm_coverage` in `--json`.
+- **The risky file is no longer the one that gets truncated.** The prompt now
+  orders files risky-first (scripts/executables before prose docs) and caps each
+  file so one large file can't starve the rest — so a payload script late in a
+  big skill still reaches the auditor.
+
+### Added
+- `Report.llm_status` (`off`/`used`/`unavailable`/`failed`) and
+  `Report.llm_coverage` (`files_seen`/`files_total`/`chars_*`/`truncated`), both
+  in `--json`.
+
+### Changed
+- **Privacy transparency.** `--llm` help and the README now state plainly that
+  enabling the AI layer **sends the skill's contents to the chosen provider**
+  (static analysis stays 100% local). Docs lead with OpenAI-compatible endpoints
+  (incl. a **fully local Ollama**) rather than framing a single hosted startup as
+  the default.
+
 ## [0.7.4] - 2026-09-09
 
 ### Fixed

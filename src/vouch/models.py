@@ -123,6 +123,16 @@ class Report:
     summary: str = ""
     engine: str = "hybrid"  # "static" | "hybrid"
     llm_used: bool = False
+    # Honest reporting of what the LLM layer actually did:
+    #   "off"         -> LLM not requested
+    #   "used"        -> LLM ran and its judgment was merged
+    #   "unavailable" -> LLM requested but no backend/key was configured
+    #   "failed"      -> LLM requested and configured, but the call errored
+    llm_status: str = "off"
+    # When the LLM ran: how much of the skill it actually saw. Guards against the
+    # "an AI reviewed this" claim being stronger than reality for big skills.
+    #   {"files_seen", "files_total", "chars_seen", "chars_total", "truncated"}
+    llm_coverage: dict[str, Any] | None = None
     capabilities: list[str] = field(default_factory=list)
     # True when a dangerous capability combination requires LLM or human review
     # that has not happened yet (verdict was floored, not cleared).
@@ -150,6 +160,8 @@ class Report:
             "risk_score": self.risk_score,
             "engine": self.engine,
             "llm_used": self.llm_used,
+            "llm_status": self.llm_status,
+            "llm_coverage": self.llm_coverage,
             "capabilities": self.capabilities,
             "review_required": self.review_required,
             "review_reasons": self.review_reasons,

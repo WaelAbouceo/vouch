@@ -166,10 +166,25 @@ to catch **evasive** threats static rules miss (payloads split across steps,
 commands assembled from variables). Set a key and add `--llm`:
 
 ```bash
-export SEG_API_KEY="sk-..."          # SovereignEG (sovereigneg.com); also supports
-                                     # OPENAI_API_KEY / CURSOR_API_KEY
+export OPENAI_API_KEY="sk-..."       # any OpenAI-compatible endpoint (OpenAI,
+                                     # OpenRouter, a local Ollama via OPENAI_BASE_URL)
 vouch --audit --llm
 ```
+
+> ⚠️ **Enabling `--llm` sends the skill's contents to your chosen LLM provider.**
+> Static analysis is 100% local and never makes a network call; the AI layer does.
+> Pick a provider you trust. Supported: any **OpenAI-compatible** endpoint
+> (`OPENAI_API_KEY` / `OPENAI_BASE_URL` — including a **fully local Ollama**),
+> **Cursor** (`CURSOR_API_KEY`), or **SovereignEG** (`SEG_API_KEY`). For maximum
+> privacy, point it at a local model.
+
+**Honesty about what the AI actually did.** If you pass `--llm` but no backend is
+configured or the call fails, Vouch prints a **warning** and shows static-only
+results — it will *not* silently pretend an AI reviewed the skill. And when a
+skill is too large for the prompt budget, Vouch reports exactly how many files the
+AI saw (`llm_coverage` in `--json`), so a partial review is never dressed up as a
+complete one. Risky/script files are shown to the AI first so they aren't the
+ones truncated away.
 
 > **The LLM never declares "malicious" on its own.** LLM judgments are
 > non-deterministic — the same skill can flip verdicts across identical runs — so
@@ -178,9 +193,8 @@ vouch --audit --llm
 > Clear a review flag with a human `--sign-off`.
 
 Backends auto-detect from the environment; force one with `--provider`
-(`seg` | `openai` | `cursor`). Any OpenAI-compatible endpoint works via
-`OPENAI_BASE_URL` (OpenAI, OpenRouter, a local Ollama, …) — see the **LLM setup**
-section under _More ways to use it_ below.
+(`openai` | `cursor` | `seg`). Any OpenAI-compatible endpoint works via
+`OPENAI_BASE_URL` — see the **LLM setup** section under _More ways to use it_ below.
 
 ---
 
@@ -229,7 +243,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.7.4
+    rev: v0.8.0
     hooks:
       - id: vouch
 ```
