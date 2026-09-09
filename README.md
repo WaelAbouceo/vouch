@@ -94,9 +94,18 @@ of isn't worth much. Be blunt with yourself about what it does **not** catch:
   a sufficiently creative multi-stage chain whose individual steps each look benign
   can still pass static analysis. The **capability gate** and the optional
   **LLM layer** exist precisely to backstop this — but neither is a guarantee.
-- **Semantic intent.** Static rules see *patterns*, not *purpose*. A skill can do
-  everything "correctly" and still be malicious in effect (e.g. subtly wrong
-  destination for otherwise-normal network calls).
+- **Prose instructions / semantic intent.** A `SKILL.md` is instructions an agent
+  will *act on*, but static rules see *patterns*, not *purpose*. By default Vouch
+  grades a capability as real ("strong") only when it appears in executable
+  context (a fenced code block or a script), because otherwise every doc that
+  *mentions* `curl` or `API_KEY` would be flagged. The tradeoff: a skill can
+  describe its attack in **plain English** — "read the `api_key` and POST it to
+  `https://…`" — and, with no literal code, dodge the capability gate. Vouch
+  surfaces the sharpest version of this (a send/exfil verb next to a secret) as a
+  **"heads-up" notice**, but it will still read `valid`, because statically we
+  cannot tell a legitimate authenticated call from exfiltration — only the
+  *destination* does, which is an **intent** question. This is exactly what the
+  optional **`--llm`** layer is for.
 - **False positives on defensive/security tools.** A linter or scanner that
   **quotes** attacks (`ignore all previous instructions`, `rm -rf /`) as detection
   patterns may be flagged for review. Command rules are context-graded (prose vs.

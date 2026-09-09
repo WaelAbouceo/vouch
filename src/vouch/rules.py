@@ -199,6 +199,28 @@ RULES: list[Rule] = [
         "endpoint. (Private/loopback ranges are ignored.)",
         category="notice",
     ),
+    Rule(
+        "EXF008",
+        "Instructions describe sending a secret/credential",
+        Severity.MEDIUM,
+        # A send/exfil verb co-located with a secret, in either order. This
+        # catches *natural-language instructions* to read a key and send it out
+        # (e.g. "post the api_key to ...") that carry no literal code for the
+        # command rules to match. It is a NOTICE, never a verdict driver:
+        # statically we cannot tell a legitimate authenticated call from
+        # exfiltration (the destination decides), so this surfaces for a human/LLM
+        # to judge rather than branding the skill.
+        _rx(r"\b(send|post|upload|exfiltrat\w*|transmit|forward|leak|dump)\b"
+            r"[^.\n]{0,60}\b(api[_-]?keys?|tokens?|secrets?|credentials?|"
+            r"password|\.env\b|private[_-]?keys?)\b"
+            r"|\b(api[_-]?keys?|tokens?|secrets?|credentials?|password|"
+            r"private[_-]?keys?)\b[^.\n]{0,60}"
+            r"\b(send|post|upload|exfiltrat\w*|transmit|forward|leak|dump)\b"),
+        "The skill's instructions describe sending a secret, token, or credential "
+        "somewhere. Often legitimate (authenticating an API call), but it is the "
+        "shape of data exfiltration written as prose — confirm where it goes.",
+        category="notice",
+    ),
     # --- Persistence -----------------------------------------------------
     Rule(
         "PER001",
