@@ -29,6 +29,8 @@ data-driven "wow" moment → deep integrations → community & credibility.
 - [ ] VS Code / Cursor extension: inline CV card when viewing a `SKILL.md`
 
 ## Phase 4 — Credibility & community
+- [ ] Migrate the MCP server to the `mcp` 2.x API (`FastMCP` → `MCPServer`) and
+      unpin `mcp<2` in the `mcp`/`all` extras.
 - [ ] Curated, versioned rule DB with a CHANGELOG and named rules
 - [ ] **Grow the labeled benchmark to 100+ real-world samples** (draw from public
       malicious-skill / malware corpora) so precision/recall numbers are

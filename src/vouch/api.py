@@ -17,9 +17,9 @@ Endpoints
 - ``POST /validate/path``    -> body: {path, use_llm?}  (local FS access)
 """
 
-from __future__ import annotations
-
 import os
+
+from . import __version__
 
 
 def create_app():
@@ -37,8 +37,9 @@ def create_app():
 
     app = FastAPI(
         title="Vouch",
-        version="0.3.0",
-        description="Vet agent Skills; classify as valid, suspicious, or malicious.",
+        version=__version__,
+        description="Security scanner for AI-agent skills: classify as valid, "
+        "suspicious, or malicious.",
     )
 
     class TextRequest(BaseModel):

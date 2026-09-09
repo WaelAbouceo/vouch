@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vouch-agent"
-version = "0.7.3"
+version = "0.7.4"
 description = "Security scanner for AI-agent skills: audit every SKILL.md on your machine for malware, prompt injection, and secret exfiltration. Deterministic static analysis (with an optional LLM layer) for Claude, Cursor, and MCP skills — like npm audit / semgrep, but for agent skills."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -48,16 +48,27 @@ dependencies = []
 
 [project.optional-dependencies]
 api = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2"]
-mcp = ["mcp>=1.2.0"]
+mcp = ["mcp>=1.2.0,<2"]  # v1 API (FastMCP); mcp 2.x renamed it to MCPServer
 llm = ["cursor-sdk>=0.1.0"]
 openai = ["openai>=1.0"]
 seg = ["sovereigneg>=0.1.0"]
-dev = ["pytest>=8", "ruff>=0.5", "pillow>=10"]
+dev = [
+  "pytest>=8",
+  "ruff>=0.5",
+  "pillow>=10",
+  # Exercise the optional delivery forms in CI (their smoke tests caught two
+  # real shipped bugs). mcp is pinned <2 to match the v1 FastMCP code and to
+  # coexist with fastapi's starlette pin (verified via `pip check`).
+  "fastapi>=0.110",
+  "httpx>=0.27",
+  "pydantic>=2",
+  "mcp>=1.2.0,<2",
+]
 all = [
   "fastapi>=0.110",
   "uvicorn>=0.29",
   "pydantic>=2",
-  "mcp>=1.2.0",
+  "mcp>=1.2.0,<2",
   "openai>=1.0",
   "sovereigneg>=0.1.0",
   "pytest>=8",

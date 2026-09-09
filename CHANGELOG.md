@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-09-09
+
+### Fixed
+- **HTTP API was broken (`vouch[api]`).** `from __future__ import annotations`
+  combined with request models defined inside `create_app()` made FastAPI/pydantic
+  unable to resolve the endpoint annotations at runtime — every request raised
+  `PydanticUndefinedAnnotation`. Removed the future-import so the models resolve.
+  The bug went unnoticed because the module had **0% test coverage**.
+- `vouch.api` no longer advertises a hard-coded stale `version="0.3.0"`; it now
+  reports the real package `__version__`.
+- **MCP server was broken (`vouch[mcp]`).** The `mcp` SDK released 2.x, which
+  renamed `FastMCP` → `MCPServer` and moved the import path, so `pip install
+  "vouch[mcp]"` pulled an incompatible SDK and `vouch-mcp` failed to start.
+  Pinned the extra to `mcp>=1.2.0,<2` to match the v1 code (verified `vouch[all]`
+  still installs cleanly via `pip check`). Migration to the 2.x API is tracked
+  in the roadmap.
+
+### Added
+- Real smoke tests for both optional delivery forms: `tests/test_api.py`
+  (FastAPI endpoints via `TestClient`, incl. the `/validate/path` FS guard) and
+  `tests/test_mcp_server.py` (MCP server builds and registers its tools). The
+  `dev` extra now installs `fastapi`/`httpx`/`mcp` so CI actually exercises both
+  entry points instead of silently skipping them. API coverage 0% → 96%.
+
 ## [0.7.3] - 2026-09-09
 
 ### Changed
