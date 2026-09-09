@@ -1,25 +1,33 @@
 #!/usr/bin/env python3
 """Generate an animated terminal demo GIF for the README — no external tools.
 
-Runs real `vouch` commands, captures their output, and renders a typed-terminal
-animation with Pillow. Regenerate with:
+Runs real `vouch` commands against a curated, reproducible set of demo skills
+and renders a typed-terminal animation with Pillow. Regenerate with:
 
     python scripts/gen_demo.py
 
 Output: docs/demo.gif
+
+The demo leads with the hero command, `vouch --audit` (scan every skill on this
+machine), then drills into one flagged skill's CV. It is deliberately
+visibility-first: Vouch shows you what your agents can do and flags the risky
+ones — it is a triage layer, not a security guarantee.
 """
 
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "demo.gif"
+VOUCH = Path(sys.executable).parent / "vouch"
 
 # --- theme (GitHub dark) ----------------------------------------------------
 BG = (13, 17, 23)
@@ -38,7 +46,7 @@ LINE_H = 21
 PAD = 22
 CHAR_W = None  # set after font load
 
-BOX_CHARS = set("╔╗╚╝║═╠╣─│")
+BOX_CHARS = set("╔╗╚╝║═╠╣─│•")
 
 
 def load_font(size: int) -> ImageFont.FreeTypeFont:
@@ -63,14 +71,13 @@ def sanitize(text: str) -> str:
 
 def color_for(line: str) -> tuple[int, int, int]:
     s = line
-    if any(c in BOX_CHARS for c in s):
-        return CYAN
     if "MALICIOUS" in s or "DO NOT LOAD" in s or "QUARANTINE" in s or "CRITICAL" in s:
         return RED
     if (
         "SUSPICIOUS" in s
         or "REVIEW" in s
         or "REQUIRED" in s
+        or "NEEDS A LOOK" in s
         or s.lstrip().startswith("!")
         or "MEDIUM" in s
     ):
@@ -79,10 +86,14 @@ def color_for(line: str) -> tuple[int, int, int]:
         return GREEN
     if "HIGH" in s:
         return MAGENTA
+    if any(c in BOX_CHARS for c in s):
+        return CYAN
     header_keys = (
         "CAPABILITIES",
         "FILES",
         "SECURITY",
+        "WHAT'S ON THIS MACHINE",
+        "BY LOCATION",
         "Verdict:",
         "Recommendation:",
         "Caps:",
@@ -90,17 +101,49 @@ def color_for(line: str) -> tuple[int, int, int]:
         "Engine:",
         "Summary:",
         "Source:",
+        "skill(s)",
     )
     if any(k in s for k in header_keys):
         return LIGHT
     return GRAY
 
 
-def run(cmd: list[str]) -> str:
+def run(args: list[str], env: dict[str, str] | None = None) -> str:
     res = subprocess.run(
-        cmd, cwd=ROOT, capture_output=True, text=True, check=False
+        [str(VOUCH), *args],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
     )
     return sanitize(res.stdout.rstrip("\n"))
+
+
+def build_demo_home() -> Path:
+    """Create a temp HOME with a curated, reproducible mix of skills.
+
+    Mix: a few clean skills, one 'flag for review' (obfuscated wipe), and two
+    genuinely malicious ones — so the audit shows all three verdict tiers.
+    """
+    # Use a non-symlinked parent (macOS symlinks /var and /tmp -> /private/...,
+    # which would defeat the tool's ~-abbreviation of skill paths).
+    home = Path(tempfile.mkdtemp(prefix="vouch-demo-", dir=str(ROOT.parent)))
+    skills = home / ".claude" / "skills"
+    skills.mkdir(parents=True)
+
+    curated = [
+        ROOT / "bench" / "benign" / "markdown-formatter",
+        ROOT / "bench" / "benign" / "weather-client",
+        ROOT / "bench" / "benign" / "db-backup",
+        ROOT / "bench" / "malicious" / "obfuscated-rm",   # -> SUSPICIOUS
+        ROOT / "bench" / "malicious" / "ssh-exfil",       # -> MALICIOUS
+        ROOT / "examples" / "malicious-skill",            # -> MALICIOUS
+    ]
+    for src in curated:
+        if src.exists():
+            shutil.copytree(src, skills / src.name)
+    return home
 
 
 # --- terminal simulation ----------------------------------------------------
@@ -114,61 +157,71 @@ class Frame:
 
 
 def build_frames() -> tuple[list[Frame], int, int]:
-    segments = [
-        ("vouch ./examples/benign-skill --cv --no-llm",
-         "A safe skill: clean bill of health."),
-        ("vouch ./examples/malicious-skill --cv --no-llm",
-         "An obviously malicious skill: caught, verdict MALICIOUS."),
-        ("vouch ./examples/evasive-skill --cv --no-llm",
-         "The evasive one: trips ZERO rules, but the capability gate stops it."),
-    ]
+    home = build_demo_home()
+    env = {**os.environ, "HOME": str(home), "NO_COLOR": "1"}
 
     frames: list[Frame] = []
     max_cols = 0
     max_rows = 0
 
+    def track(lines: list[str]) -> None:
+        nonlocal max_cols, max_rows
+        max_cols = max(max_cols, max((len(x) for x in lines), default=0))
+        max_rows = max(max_rows, len(lines))
+
     # Title
     title = [
         "",
-        "  vouch  —  the trust layer for AI agents",
-        "  vet a Skill, see what it can do, and vouch only for the safe ones",
+        "  vouch  —  see what your AI agents can actually do",
+        "  one command audits every skill on your machine and flags the risky ones",
         "",
     ]
-    frames.append(Frame(title, 1400))
-    max_cols = max(max_cols, max(len(x) for x in title))
-    max_rows = max(max_rows, len(title))
+    frames.append(Frame(title, 1600))
+    track(title)
 
-    for cmd, caption in segments:
-        output = run(cmd.split())
+    segments = [
+        (
+            ["--audit", "--no-baseline"],
+            "vouch --audit",
+            "Every skill on this machine, classified. The risky ones float to the top.",
+        ),
+        (
+            [str(home / ".claude" / "skills" / "ssh-exfil"), "--cv", "--no-llm"],
+            "vouch ~/.claude/skills/ssh-exfil --cv",
+            "Drill into one: the Skill CV shows exactly what it can do, and why it's flagged.",
+        ),
+    ]
+
+    for args, shown, caption in segments:
+        output = run(args, env=env)
         out_lines = output.split("\n")
 
         # typing animation for the command
         step = 4
-        for i in range(0, len(cmd) + 1, step):
-            frames.append(Frame([f"$ {cmd[:i]}"], 45))
-        # command complete
-        frames.append(Frame([f"$ {cmd}"], 350))
-        # output revealed
-        screen = [f"$ {cmd}", ""] + out_lines + ["", f"  # {caption}"]
-        frames.append(Frame(screen, 2600))
+        for i in range(0, len(shown) + 1, step):
+            frames.append(Frame([f"$ {shown[:i]}"], 42))
+        frames.append(Frame([f"$ {shown}"], 350))
 
-        max_cols = max(max_cols, max(len(x) for x in screen))
-        max_rows = max(max_rows, len(screen))
+        screen = [f"$ {shown}", ""] + out_lines + ["", f"  # {caption}"]
+        frames.append(Frame(screen, 3000))
+        track(screen)
 
-    # Outro
+    # Outro — honest, visibility-first
     outro = [
         "",
-        "  $ vouch <skill>            # verdict + risk + findings",
-        "  $ vouch <skill> --cv       # the Skill CV profile card",
-        "  $ vouch <agent> --agent-cv # profile a whole agent",
+        "  $ vouch --audit             # scan every skill on this machine",
+        "  $ vouch <skill> --cv        # the Skill CV profile card",
+        "  $ vouch --audit --llm       # add an optional AI second opinion",
         "",
-        "  never run a skill you can't vouch for.",
+        "  A fast triage layer — like npm audit, but for agent skills.",
+        "",
+        "  pipx run --spec vouch-agent vouch --audit",
         "",
     ]
-    frames.append(Frame(outro, 2600))
-    max_cols = max(max_cols, max(len(x) for x in outro))
-    max_rows = max(max_rows, len(outro))
+    frames.append(Frame(outro, 3200))
+    track(outro)
 
+    shutil.rmtree(home, ignore_errors=True)
     return frames, max_cols, max_rows
 
 
