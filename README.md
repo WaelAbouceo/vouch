@@ -74,6 +74,8 @@ which ones to look at. Run it again anytime to see **what changed**.
 vouch --audit                # human-readable report + diff since last run
 vouch --audit --json         # machine-readable, for dashboards/scripts
 vouch --audit /some/path     # scan a specific folder instead of the whole machine
+vouch --audit --reset-baseline   # greenfield: forget history, start a fresh baseline
+vouch --audit --no-baseline      # one-off scan; don't read or write any baseline
 ```
 
 ---
@@ -228,7 +230,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.7.1
+    rev: v0.7.2
     hooks:
       - id: vouch
 ```

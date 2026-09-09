@@ -131,6 +131,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="With --audit: do a one-off scan without reading or writing a baseline.",
     )
+    p.add_argument(
+        "--reset-baseline",
+        action="store_true",
+        help="With --audit: forget any saved baseline and start fresh (greenfield) "
+        "— this scan becomes the new baseline.",
+    )
     p.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
     p.add_argument(
         "--cv",
@@ -239,6 +245,14 @@ def main(argv: list[str] | None = None) -> int:
                 _Path(args.baseline) if args.baseline
                 else audit_mod.default_baseline_path()
             )
+            # Greenfield: forget the old baseline so this run starts clean and
+            # becomes the new baseline.
+            if args.reset_baseline and baseline_path.exists():
+                baseline_path.unlink()
+                print(
+                    f"Reset: cleared baseline at {baseline_path}",
+                    file=sys.stderr,
+                )
             base = audit_mod.load_baseline(baseline_path)
             if base is None:
                 first_run = True

@@ -6,7 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.1] - 2026-09-09
+## [0.7.2] - 2026-09-09
+
+### Added
+- `vouch --audit --reset-baseline` — **greenfield mode**: forget any saved
+  baseline and start fresh, so the current scan becomes the new baseline
+  (reports "First audit" again). Complements `--no-baseline` (a one-off scan
+  that neither reads nor writes a baseline).
 
 ### Fixed
 - `vouch --audit` now prints each flagged skill's **on-disk path** in the
