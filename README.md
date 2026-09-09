@@ -22,9 +22,21 @@ many sources, and you have no idea what they can do. Vouch tells you.
 ## Quickstart
 
 ```bash
+pipx run --spec vouch-agent vouch --audit   # zero-install; runs in an isolated env
+```
+
+Or install it, then run:
+
+```bash
 pip install vouch-agent      # zero dependencies; static analysis works out of the box
 vouch --audit                # scan every skill on this machine
 ```
+
+> **On Debian/Ubuntu (or any PEP-668 "externally-managed-environment") system**,
+> a bare `pip install` is blocked by the OS. Use **`pipx install vouch-agent`**
+> (recommended), a virtualenv (`python3 -m venv .venv && . .venv/bin/activate`),
+> or `pip install --user vouch-agent`. The `pipx run` line above needs no install
+> at all.
 
 That's it. You get one report:
 
@@ -99,13 +111,16 @@ of isn't worth much. Be blunt with yourself about what it does **not** catch:
   grades a capability as real ("strong") only when it appears in executable
   context (a fenced code block or a script), because otherwise every doc that
   *mentions* `curl` or `API_KEY` would be flagged. The tradeoff: a skill can
-  describe its attack in **plain English** — "read the `api_key` and POST it to
-  `https://…`" — and, with no literal code, dodge the capability gate. Vouch
-  surfaces the sharpest version of this (a send/exfil verb next to a secret) as a
-  **"heads-up" notice**, but it will still read `valid`, because statically we
-  cannot tell a legitimate authenticated call from exfiltration — only the
-  *destination* does, which is an **intent** question. This is exactly what the
-  optional **`--llm`** layer is for.
+  describe its attack in **plain English** with no literal code. Vouch handles
+  this in tiers: a **blatant** instruction naming an explicit destination —
+  "send the `api_key` to `https://…`" — is caught by `EXF009` and driven to
+  **`suspicious`**, so CI gating (`--fail-on suspicious`) stops it. But **softer,
+  ambiguous** phrasing — "pass the `api_key` so the server can authenticate you" —
+  is only surfaced as a **"heads-up" notice** and still reads `valid`, because
+  statically we cannot tell a legitimate authenticated call from exfiltration
+  (only the *destination* does, which is an **intent** question). Notices do
+  **not** affect exit codes, so automated pipelines get no protection from the
+  ambiguous case — that's what the optional **`--llm`** layer is for.
 - **False positives on defensive/security tools.** A linter or scanner that
   **quotes** attacks (`ignore all previous instructions`, `rm -rf /`) as detection
   patterns may be flagged for review. Command rules are context-graded (prose vs.
@@ -213,7 +228,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.5.0
+    rev: v0.7.0
     hooks:
       - id: vouch
 ```

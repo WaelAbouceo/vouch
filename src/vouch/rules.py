@@ -221,6 +221,26 @@ RULES: list[Rule] = [
         "shape of data exfiltration written as prose — confirm where it goes.",
         category="notice",
     ),
+    Rule(
+        "EXF009",
+        "Instructions send a secret to an explicit URL",
+        Severity.HIGH,
+        # The blatant, low-ambiguity case: a send/exfil verb + a secret + an
+        # explicit http(s) destination, all in one instruction. Unlike EXF008
+        # (a notice), this DOES drive the verdict to `suspicious` so CI gating
+        # (`--fail-on suspicious`) catches prose-based exfiltration. Like the
+        # INJ* rules, it fires in prose because a SKILL.md instruction IS
+        # behavior — so it is intentionally NOT in _EXEC_CONTEXT_RULES. Corpus
+        # false-positive rate is ~0.1% (1/1141), and that hit (a private key sent
+        # to an RPC URL) is itself a legitimate review case.
+        _rx(r"\b(send|post|upload|exfiltrat\w*|transmit|forward|leak|dump)\b"
+            r"[^.\n]{0,60}"
+            r"\b(api[_-]?keys?|tokens?|secrets?|credentials?|password|"
+            r"private[_-]?keys?)\b[^.\n]{0,60}\bhttps?://"),
+        "Instructions describe sending a secret/credential to an explicit URL — "
+        "the unambiguous shape of data exfiltration. Flagged for review; confirm "
+        "the destination is trusted before running this skill.",
+    ),
     # --- Persistence -----------------------------------------------------
     Rule(
         "PER001",

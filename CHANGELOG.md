@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-09
+
+### Added
+- `EXF009` rule (**threat**, HIGH) — the *blatant* prose-exfiltration case:
+  a send/exfil verb + a secret + an **explicit `http(s)://` destination** in one
+  instruction (e.g. "send the `api_key` to `https://…`"). Unlike the `EXF008`
+  notice, this **drives the verdict to `suspicious`**, so CI gating
+  (`--fail-on suspicious`) now actually stops prose-based exfiltration in
+  automated pipelines. Like the `INJ*` rules it fires in prose (a SKILL.md
+  instruction *is* behavior). High precision: **0.1% of the 1,141-skill corpus**
+  (1 hit — a private key sent to an RPC URL, itself a legitimate review case).
+
+### Changed
+- README "Known limitations" now describes exfiltration detection in tiers:
+  blatant explicit-URL prose is caught (`suspicious`, CI-gating works), while
+  softer/ambiguous phrasing remains a heads-up notice and LLM territory.
+- **Quickstart** now leads with `pipx run --spec vouch-agent` (zero-install) and
+  documents the fix for Debian/Ubuntu's PEP-668 `externally-managed-environment`
+  error (`pipx`, venv, or `--user`), the first thing many new users hit.
+
 ## [0.6.0] - 2026-09-09
 
 ### Added
