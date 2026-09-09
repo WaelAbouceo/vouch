@@ -6,7 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-09
+
 ### Added
+- `EXF008` rule (notice) — surfaces **prose instructions that describe sending a
+  secret/credential** (a send/exfil verb next to `api_key`/`token`/…). Catches
+  natural-language exfiltration that carries no literal code for the command
+  rules to match. It is a *heads-up notice*, never a verdict driver: statically
+  we can't tell a legitimate authenticated call from exfiltration (the
+  destination decides), so it's flagged for a human/LLM to judge (~4% of the
+  1,141-skill corpus). The README "Known limitations" now documents this
+  prose-instruction gap explicitly.
 - `OBF005` rule — catches commands assembled from concatenated shell variables
   at a command position (`$A$B`), the classic trick for hiding a command like
   `rm -rf` from scanners. Closes a known static blind spot (`obfuscated-rm` now
