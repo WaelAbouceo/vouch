@@ -188,10 +188,11 @@ vouch --audit --llm
 
 > ⚠️ **Enabling `--llm` sends the skill's contents to your chosen LLM provider.**
 > Static analysis is 100% local and never makes a network call; the AI layer does.
-> Pick a provider you trust. Supported: any **OpenAI-compatible** endpoint
-> (`OPENAI_API_KEY` / `OPENAI_BASE_URL` — including a **fully local Ollama**),
-> **Cursor** (`CURSOR_API_KEY`), or **SovereignEG** (`SEG_API_KEY`). For maximum
-> privacy, point it at a local model.
+> Pick a provider you trust. The default backend is any **OpenAI-compatible**
+> endpoint (`OPENAI_API_KEY` / `OPENAI_BASE_URL` — OpenAI, OpenRouter, Groq,
+> Together, vLLM, or a **fully local Ollama**); **Cursor** (`CURSOR_API_KEY`) and
+> **SovereignEG** (`SEG_API_KEY`) also work. For maximum privacy, point it at a
+> local model — then nothing leaves your machine at all.
 
 **Honesty about what the AI actually did.** If you pass `--llm` but no backend is
 configured or the call fails, Vouch prints a **warning** and shows static-only

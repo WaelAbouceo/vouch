@@ -45,8 +45,9 @@ It reports two definitions of a "positive":
 | A — flagged for review | 92% | **100%** | 0.96 | 0 misses; 1 false alarm (the defensive `prompt-linter` quoting attacks) |
 | B — classified malicious | 100% | 64% | 0.78 | 0 false accusations; some evasive threats land as "suspicious" |
 
-**Hybrid (static + LLM)** — measured live on [SovereignEG](https://sovereigneg.com)
-with `gpt-4o-mini` (`--llm --provider seg`):
+**Hybrid (static + LLM)** — measured live against an OpenAI-compatible endpoint
+running `gpt-4o-mini` (`--llm`; any OpenAI-compatible provider works — set
+`OPENAI_API_KEY`/`OPENAI_BASE_URL`, or point it at a local Ollama):
 
 | Mode | Precision | Recall | F1 | Notes |
 |------|-----------|--------|----|-------|

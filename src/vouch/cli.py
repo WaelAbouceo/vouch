@@ -22,12 +22,13 @@ from .engine import validate_skill
 from .models import Report, Severity, Verdict
 
 # Env vars that indicate an LLM backend is configured (for the --audit hint).
+# Ordered generic-OpenAI-compatible first, matching backend auto-detection.
 _LLM_KEY_ENVS_HINT = (
-    "SEG_API_KEY",
-    "SOVEREIGNEG_API_KEY",
-    "CURSOR_API_KEY",
     "OPENAI_API_KEY",
     "VOUCH_LLM_API_KEY",
+    "CURSOR_API_KEY",
+    "SEG_API_KEY",
+    "SOVEREIGNEG_API_KEY",
 )
 
 _EXIT = {Verdict.VALID: 0, Verdict.SUSPICIOUS: 1, Verdict.MALICIOUS: 2}
@@ -84,7 +85,8 @@ def _warn_llm(report: Report) -> None:
         print(
             "warning: --llm was requested but no AI backend ran (no API key or "
             "provider unreachable); showing static-only results. Set "
-            "OPENAI_API_KEY / SEG_API_KEY / CURSOR_API_KEY to enable it.",
+            "OPENAI_API_KEY (any OpenAI-compatible endpoint, incl. a local "
+            "Ollama), CURSOR_API_KEY, or SEG_API_KEY to enable it.",
             file=sys.stderr,
         )
     elif report.llm_status == "failed":
@@ -308,7 +310,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     "warning: --llm was requested but no AI backend is configured "
                     "or reachable; auditing with static analysis only. Set "
-                    "OPENAI_API_KEY / SEG_API_KEY / CURSOR_API_KEY to enable it.",
+                    "OPENAI_API_KEY (any OpenAI-compatible endpoint, incl. a "
+                    "local Ollama), CURSOR_API_KEY, or SEG_API_KEY to enable it.",
                     file=sys.stderr,
                 )
                 audit_use_llm = False

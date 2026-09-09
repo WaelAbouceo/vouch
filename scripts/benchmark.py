@@ -98,9 +98,11 @@ def main() -> int:
     ap.add_argument("--model", default=None)
     ap.add_argument(
         "--provider",
-        choices=["auto", "seg", "cursor", "openai"],
+        choices=["auto", "openai", "cursor", "seg"],
         default=None,
-        help="LLM backend (default: auto-detect). 'seg' = SovereignEG.",
+        help="LLM backend (default: auto-detect, prefers the generic "
+        "OpenAI-compatible client). 'openai' = any OpenAI-compatible endpoint; "
+        "'seg' = SovereignEG.",
     )
     args = ap.parse_args()
 

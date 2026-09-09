@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+- Swept documentation and code comments to match the generic-OpenAI-compatible
+  default: module docstring, CLI/`benchmark.py` `--provider` help and choice
+  order, `--audit`/`--llm` "backend not configured" hints, the `_LLM_KEY_ENVS_HINT`
+  ordering, the README `--llm` callout, and the `bench/README.md` hybrid-measurement
+  note (now framed as "any OpenAI-compatible endpoint," not SovereignEG-specific).
+
 ## [0.9.2] - 2026-09-09
 
 ### Changed
