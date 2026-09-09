@@ -18,3 +18,7 @@ venv/
 
 # Corpus scan output (names real public repos — publish deliberately, not by accident)
 data/
+
+# Coverage artifacts
+.coverage
+htmlcov/
