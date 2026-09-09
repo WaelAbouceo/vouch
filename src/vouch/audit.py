@@ -41,11 +41,21 @@ _USER_ROOTS = [
     "~/.agents/skills",
     "~/.codex/skills",
     "~/.config/agents/skills",
+    "~/.gemini/config/skills",
+    "~/.gemini/antigravity/skills",
+    "~/.openhands/skills",
+    "~/.cline/skills",
+    "~/.roo/skills",
+    "~/.windsurf/skills",
 ]
 _PROJECT_ROOTS = [
     "./.claude/skills",
     "./.cursor/skills",
     "./.agents/skills",
+    "./.agent/skills",
+    "./.cline/skills",
+    "./.roo/skills",
+    "./.windsurf/skills",
     "./skills",
 ]
 
