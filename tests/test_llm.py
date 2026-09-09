@@ -215,6 +215,7 @@ def test_seg_pref_requires_key(monkeypatch):
     assert llm.available_provider() is None
 
 
+@requires_openai
 def test_sk_seg_api_key_routes_to_seg(monkeypatch):
     _clear_llm_env(monkeypatch)
     monkeypatch.setenv("VOUCH_LLM_PROVIDER", "auto")
