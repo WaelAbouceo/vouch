@@ -6,7 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-09-09
+## [0.7.1] - 2026-09-09
+
+### Fixed
+- `vouch --audit` now prints each flagged skill's **on-disk path** in the
+  human-readable reports (default text and `--markdown`), not just in `--json`.
+  Previously the report showed only the skill's frontmatter `name:`, which can
+  differ from its folder (e.g. a skill named `key-sync` living in `ssh-exfil/`),
+  making a flagged skill effectively unfindable without dropping into `--json`.
+  The text report adds a dimmed `~`-abbreviated path line under each entry (also
+  for `+ NEW` diff entries); the markdown report gains a **Path** column.
 
 ### Added
 - `EXF009` rule (**threat**, HIGH) — the *blatant* prose-exfiltration case:

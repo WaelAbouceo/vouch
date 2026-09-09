@@ -378,6 +378,7 @@ _C = {
 }
 _RESET = "\033[0m"
 _BOLD = "\033[1m"
+_DIM = "\033[2m"
 
 
 def _worst(audit: MachineAudit) -> Verdict:
@@ -386,6 +387,18 @@ def _worst(audit: MachineAudit) -> Verdict:
         if _VERDICT_RANK[e.verdict] > _VERDICT_RANK[worst]:
             worst = e.verdict
     return worst
+
+
+def _short_path(p: str) -> str:
+    """Abbreviate the user's home dir to ``~`` for compact, readable output."""
+    if not p:
+        return p
+    home = os.path.expanduser("~")
+    if p == home:
+        return "~"
+    if p.startswith(home + os.sep):
+        return "~" + p[len(home):]
+    return p
 
 
 def render_text(audit: MachineAudit, color: bool = False) -> str:
@@ -423,6 +436,8 @@ def render_text(audit: MachineAudit, color: bool = False) -> str:
         mark = c(e.verdict.value.upper().ljust(10), _C[e.verdict])
         roles = ", ".join(e.roles) or "—"
         lines.append(f"  {mark} {e.name}  ({roles})")
+        if e.path:
+            lines.append(c(f"             {_short_path(e.path)}", _DIM))
         if e.headline:
             lines.append(f"             {e.headline}")
     lines.append("")
@@ -462,6 +477,8 @@ def render_diff_text(diff: AuditDiff, color: bool = False, first_run: bool = Fal
         roles = ", ".join(e.roles) or "—"
         verdict = e.verdict.value.upper()
         lines.append(c(f"  + NEW  {verdict:10} {e.name}  ({roles})", _C[e.verdict]))
+        if e.path:
+            lines.append(c(f"             {_short_path(e.path)}", _DIM))
         if e.headline:
             lines.append(f"             {e.headline}")
 
@@ -507,12 +524,13 @@ def render_markdown(audit: MachineAudit) -> str:
     if not flagged:
         lines.append("_Nothing — every skill on this machine looks clean._")
     else:
-        lines.append("| Skill | Verdict | Roles | What this means |")
-        lines.append("|---|---|---|---|")
+        lines.append("| Skill | Path | Verdict | Roles | What this means |")
+        lines.append("|---|---|---|---|---|")
         for e in flagged:
             roles = ", ".join(e.roles) or "—"
+            path = f"`{_short_path(e.path)}`" if e.path else "—"
             lines.append(
-                f"| {e.name} | {e.verdict.value} | {roles} | {e.headline} |"
+                f"| {e.name} | {path} | {e.verdict.value} | {roles} | {e.headline} |"
             )
     lines.append("")
 
