@@ -294,8 +294,8 @@ def plain_english_implications(caps: list[Capability]) -> list[tuple[str, str]]:
         )
     if net and shell:
         dangers.append(
-            "Can pull code from the internet AND run it on your machine — it "
-            "could execute whatever it downloads."
+            "Can download code from the internet AND run it on your machine — "
+            "it could execute whatever it downloads."
         )
     if persistence and (shell or fs_write):
         dangers.append(
@@ -312,9 +312,9 @@ def plain_english_implications(caps: list[Capability]) -> list[tuple[str, str]]:
             "sending them anywhere)."
         )
     if shell and not net:
-        cautions.append("Runs shell commands on your machine.")
+        cautions.append("Can run shell commands on your machine.")
     if net and not creds and not shell:
-        infos.append("Talks to the internet (can download or upload data).")
+        infos.append("Can connect to the internet (including downloading or uploading data).")
 
     result: list[tuple[str, str]] = (
         [("danger", s) for s in dangers]
