@@ -61,7 +61,7 @@ def main() -> None:
 
     # shield glyph (simple) + wordmark
     _text(d, (80, 70), "\u25c8 Vouch", _font(84, bold=True), FG)
-    _text(d, (84, 178), "the trust layer for AI agents", _font(30), MUTED)
+    _text(d, (84, 178), "security triage for AI-agent skills", _font(30), MUTED)
 
     # tagline
     _text(d, (80, 250), "See what your AI agents can actually do.",
@@ -76,10 +76,10 @@ def main() -> None:
     mono = _font(30, mono=True)
     _text(d, (px0 + 30, py0 + 58), "$ vouch --audit", mono, FG)
     _text(d, (px0 + 30, py0 + 100),
-          "53 skills \u00b7 3 locations \u00b7 4 flagged for review", mono, WARN)
+          "58 skills \u00b7 4 locations \u00b7 5 flagged for review", mono, WARN)
 
     # bottom strip
-    _text(d, (80, 545), "Deterministic  \u00b7  zero false alarms  \u00b7  100% precision",
+    _text(d, (80, 545), "Deterministic  \u00b7  runs locally  \u00b7  like npm audit for agent skills",
           _font(28), MUTED)
     _text(d, (W - 80, 545), "pip install vouch-agent", _font(30, bold=True, mono=True),
           ACCENT, anchor="ra")
