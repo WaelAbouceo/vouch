@@ -110,6 +110,34 @@ def test_des005_ignores_list_arg_rm_of_tempdir():
     assert "DES005" not in {f.rule_id for f in r.threats}
 
 
+def test_des006_catches_windows_destructive_delete():
+    from vouch.models import Verdict
+
+    for code, path in (
+        ("Remove-Item -Recurse -Force $HOME\n", "run.ps1"),
+        ("Remove-Item -Recurse -Force C:\\\n", "run.ps1"),
+        ("Remove-Item -Force -Recurse C:\\\n", "run.ps1"),
+        ("del /f /s /q C:\\\n", "run.cmd"),
+        ("rd /s /q %USERPROFILE%\n", "run.bat"),
+    ):
+        r = _scan_code(code, path=path)
+        assert "DES006" in {f.rule_id for f in r.threats}, code
+        assert r.verdict == Verdict.MALICIOUS, code
+
+
+def test_des006_ignores_scoped_windows_delete():
+    for code, path in (
+        ("Remove-Item -Recurse -Force .\\build\n", "run.ps1"),
+        ("Remove-Item -Recurse -Force C:\\build\n", "run.ps1"),
+        ("Remove-Item -Recurse -Force $HOME\\AppData\\Local\\Temp\n", "run.ps1"),
+        ("del /f /s /q .\\build\n", "run.cmd"),
+        ("rd /s /q .\\dist\n", "run.bat"),
+        ("rd /s /q %USERPROFILE%\\temp\n", "run.bat"),
+    ):
+        r = _scan_code(code, path=path)
+        assert "DES006" not in {f.rule_id for f in r.threats}, code
+
+
 # --- EXF010: prose exfil to an external/collection destination (no URL) -----
 
 def _scan_md(text):
