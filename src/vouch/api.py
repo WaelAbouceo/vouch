@@ -18,8 +18,24 @@ Endpoints
 """
 
 import os
+import sys
 
 from . import __version__
+
+
+def _is_within(path: str, root: str) -> bool:
+    """True iff ``path`` resolves to a location inside ``root`` (symlink-safe).
+
+    Uses realpath on both sides so ``..`` traversal and symlink escapes can't
+    slip a request outside the configured root.
+    """
+    root_real = os.path.realpath(root)
+    path_real = os.path.realpath(path)
+    try:
+        return os.path.commonpath([root_real, path_real]) == root_real
+    except ValueError:
+        # Different drives / mixed absolute-relative — treat as outside.
+        return False
 
 
 def create_app():
@@ -85,12 +101,35 @@ def create_app():
                 detail="Path validation disabled. Set VOUCH_ALLOW_PATH=1 "
                 "to enable local filesystem access.",
             )
+        # Optional (recommended for any shared/networked deployment): scope reads
+        # to a single directory subtree. Without this, /validate/path is an
+        # arbitrary-file-read endpoint at the same trust level as shell access.
+        root = os.environ.get("VOUCH_PATH_ROOT")
+        if root and not _is_within(req.path, root):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Path is outside the allowed root ({root}). "
+                "Set VOUCH_PATH_ROOT to widen the scope.",
+            )
         try:
             skill = loader.load(req.path)
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         report = validate_skill(skill, use_llm=req.use_llm, model=req.model)
         return report.to_dict()
+
+    # Loud warning if path reads are enabled without scoping — this is an
+    # arbitrary-file-read endpoint otherwise.
+    if os.environ.get("VOUCH_ALLOW_PATH") == "1" and not os.environ.get(
+        "VOUCH_PATH_ROOT"
+    ):
+        print(
+            "vouch-api WARNING: VOUCH_ALLOW_PATH=1 without VOUCH_PATH_ROOT — "
+            "/validate/path can read ANY file the server process can (e.g. "
+            "/etc/passwd). Set VOUCH_PATH_ROOT=/path/to/skills to scope it, or "
+            "only enable this on a trusted, non-networked host.",
+            file=sys.stderr,
+        )
 
     return app
 

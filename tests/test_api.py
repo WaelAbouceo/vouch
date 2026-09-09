@@ -72,5 +72,38 @@ def test_validate_path_enabled_reads_fs(client, tmp_path, monkeypatch):
 
 def test_validate_path_missing_is_404(client, monkeypatch):
     monkeypatch.setenv("VOUCH_ALLOW_PATH", "1")
+    monkeypatch.delenv("VOUCH_PATH_ROOT", raising=False)
     r = client.post("/validate/path", json={"path": "/nope/does/not/exist-xyz"})
     assert r.status_code == 404
+
+
+def test_path_root_scopes_reads(client, tmp_path, monkeypatch):
+    # With VOUCH_PATH_ROOT set, a skill inside the root works...
+    root = tmp_path / "allowed"
+    skill = root / "s"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: s\n---\nFormats text.\n")
+    monkeypatch.setenv("VOUCH_ALLOW_PATH", "1")
+    monkeypatch.setenv("VOUCH_PATH_ROOT", str(root))
+    r = client.post("/validate/path", json={"path": str(skill)})
+    assert r.status_code == 200
+
+    # ...but anything outside the root is refused, even though ALLOW_PATH=1.
+    r = client.post("/validate/path", json={"path": "/etc/passwd"})
+    assert r.status_code == 403
+    r = client.post("/validate/path", json={"path": "/etc/../etc/hostname"})
+    assert r.status_code == 403
+
+
+def test_path_root_blocks_traversal_escape(client, tmp_path, monkeypatch):
+    root = tmp_path / "allowed"
+    (root / "s").mkdir(parents=True)
+    (root / "s" / "SKILL.md").write_text("---\nname: s\n---\nok\n")
+    outside = tmp_path / "secret.txt"
+    outside.write_text("top secret")
+    monkeypatch.setenv("VOUCH_ALLOW_PATH", "1")
+    monkeypatch.setenv("VOUCH_PATH_ROOT", str(root))
+    # ../secret.txt escapes the root and must be blocked.
+    escape = str(root / ".." / "secret.txt")
+    r = client.post("/validate/path", json={"path": escape})
+    assert r.status_code == 403

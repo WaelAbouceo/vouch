@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-09
+
+### Security
+- **`/validate/path` can now be scoped to a directory.** `VOUCH_ALLOW_PATH=1`
+  alone made the HTTP endpoint an arbitrary-file-read (it would happily analyze
+  `/etc/passwd` or `/etc/shadow`). Set **`VOUCH_PATH_ROOT=/path/to/skills`** to
+  restrict reads to a subtree; requests outside it — including `..` traversal and
+  symlink escapes (checked via `realpath` + `commonpath`) — return `403`. If path
+  reads are enabled without a root, `vouch-api` now logs a startup warning. The
+  README documents this as "same trust level as shell access."
+
+### Docs
+- Install guidance: the optional extras (`[mcp]`/`[api]`/`[all]`) can fail to
+  install into a **system** Debian/Ubuntu Python even past PEP-668, because the
+  `mcp` SDK needs a newer `PyJWT` than the apt-managed one and pip won't override
+  a distro-owned package. Documented that extras must go in a **venv or pipx**
+  (verified: fresh venv resolves PyJWT 2.x, `pip check` clean).
+
 ## [0.8.0] - 2026-09-09
 
 ### Fixed

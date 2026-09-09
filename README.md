@@ -36,6 +36,12 @@ vouch --audit                # scan every skill on this machine
 > (recommended), a virtualenv (`python3 -m venv .venv && . .venv/bin/activate`),
 > or `pip install --user vouch-agent`. The `pipx run` line above needs no install
 > at all.
+>
+> **Installing the optional extras** (`vouch-agent[mcp]`, `[api]`, `[all]`) into
+> the **system Python** on Debian/Ubuntu can fail even past PEP-668: the `mcp`
+> SDK needs a newer `PyJWT` than the apt-managed one, and pip won't override a
+> distro-owned package. Always install extras in a **venv or via pipx**, where
+> the dependency graph resolves cleanly (verified: PyJWT 2.x, `pip check` clean).
 
 That's it. You get one report:
 
@@ -243,7 +249,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.8.0
+    rev: v0.8.1
     hooks:
       - id: vouch
 ```
@@ -264,6 +270,14 @@ curl -sX POST localhost:8000/validate/text \
 ```
 Endpoints: `GET /health`, `POST /validate/text`, `POST /validate/path`
 (path is disabled unless `VOUCH_ALLOW_PATH=1`).
+
+> ⚠️ **`/validate/path` reads local files.** `VOUCH_ALLOW_PATH=1` alone is an
+> **arbitrary-file-read** at the same trust level as shell access — it will read
+> anything the server process can (`/etc/passwd`, `/etc/shadow`, …). For any
+> shared or networked deployment, **scope it** with `VOUCH_PATH_ROOT=/path/to/skills`;
+> requests outside that root (including `..` traversal and symlink escapes) get a
+> `403`. If you enable path reads without a root, `vouch-api` logs a startup
+> warning.
 </details>
 
 <details>
