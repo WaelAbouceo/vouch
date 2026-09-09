@@ -258,7 +258,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.9.1
+    rev: v0.9.2
     hooks:
       - id: vouch
 ```
@@ -292,19 +292,32 @@ Endpoints: `GET /health`, `POST /validate/text`, `POST /validate/path`
 <details>
 <summary><b>LLM setup (all providers)</b></summary>
 
-`use_llm` auto-enables when any of `SEG_API_KEY`, `OPENAI_API_KEY`,
-`CURSOR_API_KEY`, or `VOUCH_LLM_API_KEY` is set; force it with `--llm` /
-`--no-llm`. Pick a backend with `--provider` or `VOUCH_LLM_PROVIDER`.
+The default backend is a **generic OpenAI-compatible client** — use whichever
+provider you already trust. `use_llm` auto-enables when any of `OPENAI_API_KEY`,
+`VOUCH_LLM_API_KEY`, `CURSOR_API_KEY`, or `SEG_API_KEY` is set; force it with
+`--llm` / `--no-llm`. Pick a backend with `--provider` or `VOUCH_LLM_PROVIDER`
+(auto-detect prefers OpenAI-compatible, then Cursor, then SovereignEG).
 
 ```bash
-# SovereignEG (default host https://sovereigneg.com, /v1 added automatically)
-export SEG_API_KEY="sk-..."; export SEG_MODEL="gpt-4o-mini"   # model optional
+pip install "vouch-agent[openai]"
 
-# OpenAI / OpenRouter / Together / local Ollama
-export OPENAI_API_KEY="sk-..."; export OPENAI_BASE_URL="http://localhost:11434/v1"
+# OpenAI (default)
+export OPENAI_API_KEY="sk-..."; export OPENAI_MODEL="gpt-4o-mini"   # model optional
+
+# Any OpenAI-compatible endpoint — OpenRouter, Together, Groq, vLLM, LM Studio…
+export OPENAI_API_KEY="..."; export OPENAI_BASE_URL="https://openrouter.ai/api/v1"
+
+# Fully local (no data leaves your machine) — Ollama
+export OPENAI_API_KEY="ollama"; export OPENAI_BASE_URL="http://localhost:11434/v1"
+export OPENAI_MODEL="llama3.1"
+
+# Vendor-neutral aliases also work: VOUCH_LLM_API_KEY / VOUCH_LLM_BASE_URL / VOUCH_MODEL
 
 # Cursor SDK
 pip install "vouch-agent[llm]"; export CURSOR_API_KEY="cursor_..."
+
+# SovereignEG (also OpenAI-compatible; host https://sovereigneg.com, /v1 auto-added)
+export SEG_API_KEY="sk-..."; export SEG_MODEL="gpt-4o-mini"
 ```
 </details>
 

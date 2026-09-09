@@ -5,19 +5,23 @@ Skill and return strict JSON, then merges that judgment into the deterministic
 pipeline. If no backend is configured, :func:`analyze_with_llm` returns ``None``
 and the engine falls back to static-only analysis.
 
-Supported backends (auto-detected, in priority order):
+The default backend is a **generic OpenAI-compatible client** — point it at
+whichever provider you already trust. Supported backends (auto-detected, in
+priority order):
 
-1. **SovereignEG** — set ``SEG_API_KEY``. Uses the OpenAI-compatible ``/v1`` path
-   (falls back to the ``sovereigneg`` SDK). Endpoint defaults to
-   ``https://sovereigneg.com`` (``/v1`` is appended); override with
-   ``SEG_BASE_URL`` / ``SEG_MODEL``.
+1. **OpenAI-compatible (default)** — set ``OPENAI_API_KEY`` (or the vendor-neutral
+   ``VOUCH_LLM_API_KEY``); needs the ``openai`` package. Works with *any*
+   OpenAI-compatible endpoint via ``OPENAI_BASE_URL`` (or ``VOUCH_LLM_BASE_URL``):
+   OpenAI, Azure OpenAI, OpenRouter, Together, Groq, a local Ollama
+   (``http://localhost:11434/v1``), vLLM, LM Studio, etc. Model:
+   ``OPENAI_MODEL`` / ``VOUCH_MODEL`` (default ``gpt-4o-mini``).
 2. **Cursor SDK** — set ``CURSOR_API_KEY`` (needs the ``cursor-sdk`` package).
-3. **OpenAI-compatible** — set ``OPENAI_API_KEY`` (needs the ``openai`` package).
-   Works with any OpenAI-compatible endpoint via ``OPENAI_BASE_URL``:
-   OpenAI, OpenRouter, Together, or a local Ollama (``http://localhost:11434/v1``).
+3. **SovereignEG** — set ``SEG_API_KEY``. This is just another OpenAI-compatible
+   endpoint (``https://sovereigneg.com/v1``), kept for convenience; override with
+   ``SEG_BASE_URL`` / ``SEG_MODEL``.
 
-Override the provider with ``VOUCH_LLM_PROVIDER=auto|seg|cursor|openai`` and the
-model with ``VOUCH_MODEL`` (or ``SEG_MODEL`` / ``OPENAI_MODEL`` per backend).
+Override the provider with ``VOUCH_LLM_PROVIDER=auto|openai|cursor|seg`` and the
+model with ``VOUCH_MODEL`` (or ``OPENAI_MODEL`` / ``SEG_MODEL`` per backend).
 
 For testing or custom integrations, pass ``responder=callable(system, prompt)``
 to :func:`analyze_with_llm` to bypass all built-in backends.
@@ -151,19 +155,23 @@ def _has_openai(api_key: str | None = None) -> bool:
 def available_provider(api_key: str | None = None) -> str | None:
     """Return the name of the backend that would be used, or ``None``."""
     pref = os.environ.get("VOUCH_LLM_PROVIDER", "auto").lower().strip()
-    if pref == "seg":
-        return "seg" if _has_seg(api_key) else None
-    if pref == "cursor":
-        return "cursor" if _has_cursor(api_key) else None
     if pref == "openai":
         return "openai" if _has_openai(api_key) else None
-    # auto: SovereignEG first (its keys are unmistakable), then Cursor, OpenAI.
-    if _has_seg(api_key) or str(api_key or "").startswith("sk-seg-"):
-        return "seg"
-    if _has_cursor(api_key):
-        return "cursor"
+    if pref == "cursor":
+        return "cursor" if _has_cursor(api_key) else None
+    if pref == "seg":
+        return "seg" if _has_seg(api_key) else None
+    # auto: generic OpenAI-compatible first, then Cursor, then SovereignEG.
+    # (A key passed as `sk-seg-...` is unmistakably SovereignEG, so honour it
+    # before the generic branch, which would otherwise claim any provided key.)
+    if str(api_key or "").startswith("sk-seg-"):
+        return "seg" if _has_seg(api_key) else None
     if _has_openai(api_key):
         return "openai"
+    if _has_cursor(api_key):
+        return "cursor"
+    if _has_seg(api_key):
+        return "seg"
     return None
 
 

@@ -320,11 +320,11 @@ class Engine:
 
 
 _LLM_KEY_ENVS = (
-    "SEG_API_KEY",
-    "SOVEREIGNEG_API_KEY",
-    "CURSOR_API_KEY",
     "OPENAI_API_KEY",
     "VOUCH_LLM_API_KEY",
+    "CURSOR_API_KEY",
+    "SEG_API_KEY",
+    "SOVEREIGNEG_API_KEY",
 )
 
 

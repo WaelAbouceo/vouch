@@ -199,12 +199,14 @@ def test_seg_detected_when_key_set(monkeypatch):
 
 
 @requires_openai
-def test_seg_takes_priority_over_openai(monkeypatch):
+def test_openai_takes_priority_over_seg(monkeypatch):
+    # The generic OpenAI-compatible client is the default backend; when both an
+    # OpenAI key and a SovereignEG key are present, auto picks OpenAI.
     _clear_llm_env(monkeypatch)
     monkeypatch.setenv("VOUCH_LLM_PROVIDER", "auto")
     monkeypatch.setenv("SEG_API_KEY", "sk-seg-abc")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
-    assert llm.available_provider() == "seg"
+    assert llm.available_provider() == "openai"
 
 
 def test_seg_pref_requires_key(monkeypatch):

@@ -249,11 +249,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model", default=None, help="Override the LLM model id.")
     p.add_argument(
         "--provider",
-        choices=["auto", "seg", "cursor", "openai"],
+        choices=["auto", "openai", "cursor", "seg"],
         default=None,
-        help="LLM backend to use (default: auto-detect). 'seg' = SovereignEG "
-        "(set SEG_API_KEY); 'openai' works with any OpenAI-compatible endpoint "
-        "via OPENAI_BASE_URL.",
+        help="LLM backend to use (default: auto-detect). 'openai' is the generic "
+        "OpenAI-compatible client — set OPENAI_API_KEY and (optionally) "
+        "OPENAI_BASE_URL to use OpenAI, OpenRouter, Groq, a local Ollama, etc. "
+        "'seg' = SovereignEG (set SEG_API_KEY).",
     )
     p.add_argument(
         "--no-color", action="store_true", help="Disable ANSI colors in text output."

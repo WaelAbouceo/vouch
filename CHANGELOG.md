@@ -6,7 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.9.1] - 2026-09-09
+## [0.9.2] - 2026-09-09
+
+### Changed
+- **LLM backend is now generic-OpenAI-compatible first, not SovereignEG-first.**
+  Auto-detection prefers the OpenAI-compatible client (`OPENAI_API_KEY` /
+  `VOUCH_LLM_API_KEY`, any `OPENAI_BASE_URL` — OpenAI, OpenRouter, Groq, Together,
+  vLLM, LM Studio, or a fully local Ollama), then Cursor, then SovereignEG.
+  SovereignEG still works (it's just another OpenAI-compatible endpoint) but is no
+  longer the default. An explicit `sk-seg-…` key still routes to SovereignEG.
+- `--provider` / `VOUCH_LLM_PROVIDER` choices reordered to
+  `auto|openai|cursor|seg`; help text and README lead with the generic
+  OpenAI-compatible setup (including a copy-paste **local Ollama** example).
 
 ### Fixed
 - **Capability false positives at the real root cause** (`capabilities.py`, not
