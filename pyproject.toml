@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vouch-agent"
 version = "0.10.0"
-description = "Security scanner for AI-agent skills: audit every SKILL.md on your machine for malware, prompt injection, and secret exfiltration. Deterministic static analysis (with an optional LLM layer) for Claude, Cursor, and MCP skills — like npm audit / semgrep, but for agent skills."
+description = "See what your AI-agent skills can actually do. Vouch audits every SKILL.md on your machine, explains each skill's capabilities in plain English, and flags the risky ones — checking for destructive commands, secret exfiltration, and prompt injection. Deterministic, local static analysis (optional LLM layer) for Claude, Cursor, Codex, and MCP skills. A fast triage/visibility layer — like npm audit, but for agent skills."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
