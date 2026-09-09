@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-09
+
+Addresses first external-tester feedback.
+
+### Added
+- **`EXF010`** — flags prose that describes collecting a secret and sending it to
+  an **external/collection/attacker** destination *without a literal URL*
+  ("upload the API tokens to an external URL", "send the api_key to our collection
+  server"). Drives the verdict to `suspicious`, so `--fail-on suspicious` catches
+  it — closing a gap where blatant prose exfiltration read `valid`. Scoped to
+  exfil-shaped destinations, so ordinary "send the key to the payment API" stays
+  clean (0 new false positives across the 1,141-skill corpus).
+- **`VOUCH_SKILL_ROOTS`** — point `vouch --audit` at non-standard skill locations
+  (e.g. a container's `/mnt/skills`); path-separator- or comma-separated. `--audit`
+  also prints a hint when it finds nothing in the standard locations.
+
+### Fixed
+- **`--json` is now pure machine output.** Human advisories (the `--fail-on`
+  note, LLM warnings) are suppressed entirely in `--json` mode — previously they
+  went to stderr and could break `json.loads` for anyone capturing combined
+  streams (the flagship `--audit --json` dashboard workflow).
+- **`--fail-on` note no longer lies on mixed audits.** The "exited 0 because
+  --fail-on defaults to malicious" note now only prints when the run actually
+  exited 0. A mixed audit whose worst verdict is `malicious` (exit 2) no longer
+  shows the contradictory note.
+- **`vouch-api` fails gracefully.** Missing `uvicorn`/FastAPI now yields a clean
+  `pip install "vouch-agent[api]"` message instead of a raw traceback (matching
+  `vouch-mcp`); the install hint also uses the correct `vouch-agent` name.
+
+### Docs
+- Documented `vouch --audit <path>` and `VOUCH_SKILL_ROOTS`; updated the
+  "Known limitations" prose-exfil tier to include `EXF010`.
+
 ## [0.9.3] - 2026-09-09
 
 ### Docs

@@ -53,10 +53,22 @@ _PROJECT_ROOTS = [
 def known_skill_roots(
     extra: list[str] | None = None, *, include_project: bool = True
 ) -> list[Path]:
-    """Return the skill-install directories that exist on this machine."""
+    """Return the skill-install directories that exist on this machine.
+
+    Non-standard setups (e.g. a container that mounts skills at ``/mnt/skills``)
+    can add locations via the ``VOUCH_SKILL_ROOTS`` environment variable, a list
+    of paths separated by the OS path separator (``:`` on Unix, ``;`` on Windows)
+    or commas.
+    """
     candidates = list(_USER_ROOTS)
     if include_project:
         candidates += _PROJECT_ROOTS
+    env_roots = os.environ.get("VOUCH_SKILL_ROOTS", "")
+    if env_roots:
+        for chunk in env_roots.replace(",", os.pathsep).split(os.pathsep):
+            chunk = chunk.strip()
+            if chunk:
+                candidates.append(chunk)
     if extra:
         candidates += list(extra)
 

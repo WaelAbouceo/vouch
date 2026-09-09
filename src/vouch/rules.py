@@ -65,6 +65,27 @@ def _rx(pat: str, flags: int = re.IGNORECASE) -> re.Pattern[str]:
     return re.compile(pat, flags)
 
 
+# Building blocks for prose exfiltration-intent rules (EXF009/EXF010). A SKILL.md
+# is instructions an agent acts on, so an imperative describing "read a secret and
+# send it to an external place" is behaviour, not just documentation.
+_EXFIL_VERB = (
+    r"(?:send|post|upload|exfiltrat\w*|transmit|forward|leak|dump|deliver|ship|report)"
+)
+_SECRET_NOUN = (
+    r"(?:api[_-]?keys?|tokens?|secrets?|credentials?|passwords?|\.env\b|"
+    r"private[_-]?keys?|ssh[\s_-]?keys?|id_[a-z0-9]+)"
+)
+# Destinations that signal *exfiltration*, not a normal authenticated API call.
+# Deliberately excludes "external API/service" (ordinary integrations) to avoid
+# flagging legitimate "send the key to the payment API" phrasing.
+_EXFIL_DEST = (
+    r"(?:collection|exfil\w*|attacker\S*|c2\b|command[-\s]?and[-\s]?control|"
+    r"webhook|drop[-\s]?site|off[-\s]?site|"
+    r"(?:external|remote|third[-\s]?party)\s+(?:url|server|host|endpoint|address|"
+    r"machine|site))"
+)
+
+
 RULES: list[Rule] = [
     # --- Remote code execution / piping to shell -------------------------
     Rule(
@@ -270,6 +291,25 @@ RULES: list[Rule] = [
         "Instructions describe sending a secret/credential to an explicit URL — "
         "the unambiguous shape of data exfiltration. Flagged for review; confirm "
         "the destination is trusted before running this skill.",
+    ),
+    Rule(
+        "EXF010",
+        "Instructions send a secret to an external/collection destination",
+        Severity.HIGH,
+        # Like EXF009 but the destination is described in words rather than a
+        # literal URL ("upload the API tokens to an external URL", "send the
+        # api_key to our collection server"). Drives the verdict to `suspicious`
+        # so prose-based exfiltration fails `--fail-on suspicious`. Fires in prose
+        # (NOT in _EXEC_CONTEXT_RULES): a SKILL.md instruction IS behaviour.
+        _rx(
+            rf"{_EXFIL_VERB}\b[^.\n]{{0,50}}\b{_SECRET_NOUN}\b[^.\n]{{0,50}}{_EXFIL_DEST}"
+            rf"|{_EXFIL_VERB}\b[^.\n]{{0,50}}{_EXFIL_DEST}[^.\n]{{0,50}}\b{_SECRET_NOUN}"
+            rf"|\b{_SECRET_NOUN}\b[^.\n]{{0,80}}{_EXFIL_VERB}\b[^.\n]{{0,50}}{_EXFIL_DEST}"
+        ),
+        "The skill's instructions describe collecting a secret/credential and "
+        "sending it to an external, collection, or attacker-controlled "
+        "destination — the shape of data exfiltration, written as prose. Flagged "
+        "for review; confirm where the data actually goes.",
     ),
     # --- Persistence -----------------------------------------------------
     Rule(

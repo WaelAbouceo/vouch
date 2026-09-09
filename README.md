@@ -83,6 +83,12 @@ vouch --audit --reset-baseline   # greenfield: forget history, start a fresh bas
 vouch --audit --no-baseline      # one-off scan; don't read or write any baseline
 ```
 
+`vouch --audit` scans the standard agent locations (`~/.claude/skills`,
+`~/.cursor/skills`, `~/.codex/skills`, …). If your skills live somewhere else
+(e.g. a container that mounts them at `/mnt/skills`), pass the path
+(`vouch --audit /mnt/skills`) or point Vouch at one or more roots with the
+`VOUCH_SKILL_ROOTS` environment variable (path-separator- or comma-separated).
+
 ---
 
 ## Why trust the verdict
@@ -129,7 +135,9 @@ of isn't worth much. Be blunt with yourself about what it does **not** catch:
   *mentions* `curl` or `API_KEY` would be flagged. The tradeoff: a skill can
   describe its attack in **plain English** with no literal code. Vouch handles
   this in tiers: a **blatant** instruction naming an explicit destination —
-  "send the `api_key` to `https://…`" — is caught by `EXF009` and driven to
+  "send the `api_key` to `https://…`" (`EXF009`) — or one naming an
+  external/collection destination in words — "upload the tokens to an external
+  URL", "send the `api_key` to our collection server" (`EXF010`) — is driven to
   **`suspicious`**, so CI gating (`--fail-on suspicious`) stops it. But **softer,
   ambiguous** phrasing — "pass the `api_key` so the server can authenticate you" —
   is only surfaced as a **"heads-up" notice** and still reads `valid`, because
@@ -259,7 +267,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.9.3
+    rev: v0.10.0
     hooks:
       - id: vouch
 ```

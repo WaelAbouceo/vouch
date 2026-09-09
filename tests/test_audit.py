@@ -34,6 +34,26 @@ def test_known_roots_returns_only_existing_dirs(tmp_path):
     assert str((tmp_path / "nope").resolve()) not in resolved
 
 
+def test_known_roots_reads_vouch_skill_roots_env(tmp_path, monkeypatch):
+    mount = tmp_path / "mnt" / "skills"
+    mount.mkdir(parents=True)
+    other = tmp_path / "extra"
+    other.mkdir()
+    import os
+    monkeypatch.setenv("VOUCH_SKILL_ROOTS", os.pathsep.join([str(mount), str(other)]))
+    resolved = {str(r) for r in known_skill_roots()}
+    assert str(mount.resolve()) in resolved
+    assert str(other.resolve()) in resolved
+
+
+def test_known_roots_env_accepts_comma_separator(tmp_path, monkeypatch):
+    mount = tmp_path / "skills"
+    mount.mkdir()
+    monkeypatch.setenv("VOUCH_SKILL_ROOTS", f"{mount},{tmp_path / 'nope'}")
+    resolved = {str(r) for r in known_skill_roots()}
+    assert str(mount.resolve()) in resolved
+
+
 def test_audit_classifies_and_sorts_worst_first(tmp_path):
     root = tmp_path / "skills"
     _make_skill(root, "clean", "Just writes a friendly greeting for the user.")

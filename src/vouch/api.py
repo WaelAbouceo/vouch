@@ -44,8 +44,8 @@ def create_app():
         from pydantic import BaseModel, Field
     except Exception as e:  # pragma: no cover - import guard
         raise SystemExit(
-            "FastAPI is required. Install with: pip install "
-            '"vouch[api]"'
+            "The HTTP API needs extra dependencies. Install with: "
+            'pip install "vouch-agent[api]"'
         ) from e
 
     from . import loader
@@ -142,11 +142,23 @@ except SystemExit:
 
 
 def run() -> None:  # pragma: no cover - thin runner
-    import uvicorn
-
+    # Fail with a clean, actionable message (like vouch-mcp) instead of a raw
+    # traceback when the optional server deps aren't installed.
+    try:
+        import uvicorn
+    except Exception as e:
+        raise SystemExit(
+            "The HTTP API needs extra dependencies. Install with: "
+            'pip install "vouch-agent[api]"'
+        ) from e
+    if app is None:
+        raise SystemExit(
+            "The HTTP API needs extra dependencies. Install with: "
+            'pip install "vouch-agent[api]"'
+        )
     host = os.environ.get("VOUCH_HOST", "0.0.0.0")
     port = int(os.environ.get("VOUCH_PORT", "8000"))
-    uvicorn.run("vouch.api:app", host=host, port=port)
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":  # pragma: no cover

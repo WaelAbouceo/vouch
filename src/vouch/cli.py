@@ -65,10 +65,15 @@ def _exit_for(verdict: Verdict, fail_on: str | None) -> int:
 def _fail_on_notice(verdict: Verdict, review_required: bool, fail_on: str | None) -> None:
     """Tell the user when a review-worthy result silently passed CI by default.
 
-    Only nudges when the user is on the default (didn't pass --fail-on), so it
-    never nags someone who explicitly chose a policy.
+    Only nudges when:
+    - the user is on the default (didn't pass --fail-on), so we never nag
+      someone who explicitly chose a policy; AND
+    - the run actually exited 0 — otherwise (e.g. a mixed audit whose worst
+      verdict is malicious) the "exited 0" note would be flatly wrong.
     """
     if fail_on is not None:
+        return
+    if _exit_for(verdict, fail_on) != 0:
         return
     if verdict == Verdict.SUSPICIOUS or review_required:
         print(
@@ -193,8 +198,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--audit",
         action="store_true",
-        help="Audit every skill installed on this machine (or under the given "
-        "path/paths): classify what each one does and flag the risky ones.",
+        help="Audit every skill installed on this machine: classify what each "
+        "one does and flag the risky ones. Scans standard agent locations "
+        "(~/.claude/skills, ~/.cursor/skills, ...). For non-standard setups, "
+        "pass a path (`vouch --audit /mnt/skills`) or set VOUCH_SKILL_ROOTS.",
     )
     p.add_argument(
         "--baseline",
@@ -391,9 +398,20 @@ def main(argv: list[str] | None = None) -> int:
         if not args.no_baseline and baseline_path is not None:
             audit_mod.save_baseline(machine, baseline_path)
 
+        # Don't leave a user staring at an empty report on a non-standard setup.
+        if machine.total == 0 and roots is None and not args.json:
+            print(
+                "\nNo skills found in the standard agent locations. If your "
+                "skills live elsewhere, point Vouch at them:\n"
+                "  vouch --audit /path/to/skills\n"
+                "  VOUCH_SKILL_ROOTS=/mnt/skills vouch --audit",
+                file=sys.stderr,
+            )
+
         worst = audit_mod._worst(machine)
         worst_review = any(e.review_required for e in machine.flagged)
-        _fail_on_notice(worst, worst_review, args.fail_on)
+        if not args.json:  # keep machine output pure — no sidecar advisory
+            _fail_on_notice(worst, worst_review, args.fail_on)
         return _exit_for(worst, args.fail_on)
 
     # Agent CV: aggregate every skill under the target directory.
@@ -418,7 +436,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(agent_mod.render_text(agent_cv, color=color))
         verdict = agent_cv.verdict
-        _fail_on_notice(verdict, False, args.fail_on)
+        if not args.json:
+            _fail_on_notice(verdict, False, args.fail_on)
         return _exit_for(verdict, args.fail_on)
 
     if args.target is None:
@@ -460,11 +479,14 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(_render(report, color))
 
-    # Warn on stderr (so JSON/markdown/CV output stays clean) whenever the AI
-    # layer was asked for but didn't fully do its job — never let the tool imply
-    # "an AI reviewed this" when it didn't.
-    _warn_llm(report)
-    _fail_on_notice(report.verdict, report.review_required, args.fail_on)
+    # In --json mode, keep stdout AND stderr free of human advisories so the
+    # output is pure machine-readable (CI often captures both streams together);
+    # the same facts are already in the JSON (llm_status, review_required, ...).
+    if not args.json:
+        # Warn whenever the AI layer was asked for but didn't fully do its job —
+        # never let the tool imply "an AI reviewed this" when it didn't.
+        _warn_llm(report)
+        _fail_on_notice(report.verdict, report.review_required, args.fail_on)
     return _exit_for(report.verdict, args.fail_on)
 
 
