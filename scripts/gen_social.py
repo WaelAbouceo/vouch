@@ -79,7 +79,8 @@ def main() -> None:
           "58 skills \u00b7 4 locations \u00b7 5 flagged for review", mono, WARN)
 
     # bottom strip
-    _text(d, (80, 545), "Deterministic  \u00b7  runs locally  \u00b7  like npm audit for agent skills",
+    _text(d, (80, 545),
+          "Deterministic  ·  runs locally  ·  like npm audit for agent skills",
           _font(28), MUTED)
     _text(d, (W - 80, 545), "pip install vouch-agent", _font(30, bold=True, mono=True),
           ACCENT, anchor="ra")
