@@ -225,3 +225,24 @@ def test_reverse_shell_detected_as_shell_capability():
         source="file",
     )
     assert "shell" in active_keys(scan_capabilities(s))
+
+
+def test_known_roots_includes_extended_agent_frameworks(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+
+    agent_dirs = [
+        tmp_path / ".gemini" / "config" / "skills",
+        tmp_path / ".openhands" / "skills",
+        tmp_path / ".cline" / "skills",
+        tmp_path / ".agent" / "skills",
+        tmp_path / ".windsurf" / "skills",
+    ]
+    for d in agent_dirs:
+        d.mkdir(parents=True)
+
+    roots = known_skill_roots()
+    resolved = {str(r.resolve()) for r in roots}
+    for d in agent_dirs:
+        assert str(d.resolve()) in resolved
+
