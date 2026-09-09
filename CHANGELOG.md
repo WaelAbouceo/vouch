@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-09
+
+### Fixed
+- **Capability false positives at the real root cause** (`capabilities.py`, not
+  the loader). These were mis-diagnosed in 0.9.0 and are now actually fixed:
+  - **Network access** no longer fires on a bare URL string. A URL sitting in a
+    `LICENSE.txt` or an XML namespace (`xmlns="http://…"`) is just text, not
+    access. Network is inferred from real calls/commands (`curl`, `wget`,
+    `requests.*`, `urllib`, `httpx`, `http.get(`, …) or a URL next to a
+    fetch/download verb ("download … from https://…").
+  - **Dynamic code execution** no longer fires on `re.compile(...)` (or any
+    `x.eval(`/`.exec(`/`.compile(` method call, e.g. pandas `df.eval`). Only the
+    bare builtins `eval()`/`exec()`/`compile()`/`Function()` count.
+
+### Changed
+- **Corpus numbers updated** to match the tightened engine: valid **1,043**,
+  suspicious **88**, malicious **10** (was 953/178/10). The capability gate now
+  fires on **7.1%** (was 15%) and Network-access detections dropped **636 → 254**
+  — nearly all of the removed hits were bare URLs in prose. `docs/scan-findings.md`
+  reflects the new figures.
+- **Known limitations** now states plainly that one level of variable indirection
+  (`t = expanduser("~"); shutil.rmtree(t)`) defeats literal-pattern rules — Vouch
+  does no data-flow analysis, so "caught" means "this literal shape is caught."
+
 ## [0.9.0] - 2026-09-09
 
 ### Added

@@ -13,16 +13,16 @@ the same verdict.
 
 ## The headline
 
-- **~1 in 6 skills (16.5%) weren't a clean pass.** 178 were flagged
+- **Roughly 1 in 12 skills (8.6%) weren't a clean pass.** 88 were flagged
   *"review this first,"* and 10 tripped hard danger rules.
-- **1 in 7 skills (15.0%, 171 of them) request a dangerous *capability
+- **1 in 14 skills (7.1%, 81 of them) request a dangerous *capability
   combination*** — e.g. the ability to read secrets **and** reach the network,
   the classic "copy your keys and send them somewhere" shape.
 
 | verdict | count | share |
 |---|---:|---:|
-| valid | 953 | 83.5% |
-| suspicious (review) | 178 | 15.6% |
+| valid | 1,043 | 91.4% |
+| suspicious (review) | 88 | 7.7% |
 | malicious (hard rule hit) | 10 | 0.9% |
 
 ## The real story isn't malware — it's quiet power
@@ -34,10 +34,10 @@ casually request, buried in a Markdown file you were never going to read:
 |---|---:|
 | Filesystem writes | 785 |
 | Shell execution | 720 |
-| Network access | 636 |
 | Filesystem reads | 467 |
 | Credential / secret access | 448 |
 | Environment variable access | 294 |
+| Network access | 254 |
 | Persistence mechanisms | 33 |
 
 Most of these are perfectly innocent. But you can't tell which ones aren't

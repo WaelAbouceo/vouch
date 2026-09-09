@@ -57,9 +57,21 @@ _CAP_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
     (
         "network",
         "Network access",
+        # Key off actual network CALLS/commands, not bare URL literals. A URL
+        # sitting in a LICENSE file or an XML namespace string is not "network
+        # access" — only an API/command that reaches the network is. (We match
+        # `http.get(`/`https.request(` with the dot, which cannot match the
+        # `http://` scheme, and never match the bare words `http`/`https`.)
         re.compile(
-            r"\b(curl|wget|fetch\(|requests\.(get|post|put|delete)|urllib|"
-            r"http\.client|axios|http[sx]?://)\b",
+            r"\b(?:curl|wget|urllib|urlopen|httpx|aiohttp|axios|socket)\b"
+            r"|\bfetch\("
+            r"|\brequests\.(?:get|post|put|patch|delete|head|request)\b"
+            r"|\bhttp\.client\b"
+            r"|\bhttps?\.(?:get|request)\("
+            # A URL only counts as network when a fetch/download verb sits next to
+            # it (prose intent like "download X from https://..."). A URL alone —
+            # in a LICENSE file or an XML namespace — is just a string, not access.
+            r"|\b(?:download|fetch|retriev\w*|upload|post)\w*\b[^\n]{0,40}https?://",
             re.IGNORECASE,
         ),
     ),
@@ -78,7 +90,10 @@ _CAP_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
     (
         "code_exec",
         "Dynamic code execution",
-        re.compile(r"\b(eval\(|exec\(|Function\(|compile\(|importlib)\b"),
+        # Only the *builtins* eval()/exec()/compile()/Function() count. A leading
+        # word char or dot means it's a method/attribute call — re.compile(),
+        # df.eval(), self.exec() — which is not dynamic code execution.
+        re.compile(r"(?<![\w.])(?:eval|exec|compile|Function)\(|\bimportlib\b"),
     ),
     (
         "fs_write",

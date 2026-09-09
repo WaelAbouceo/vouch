@@ -113,6 +113,15 @@ of isn't worth much. Be blunt with yourself about what it does **not** catch:
   a sufficiently creative multi-stage chain whose individual steps each look benign
   can still pass static analysis. The **capability gate** and the optional
   **LLM layer** exist precisely to backstop this — but neither is a guarantee.
+- **One assignment of indirection defeats literal-pattern rules.** The rules match
+  on what a line *says*, not what it *does*, so a single variable hop can hide the
+  target: `shutil.rmtree(os.path.expanduser("~"))` is caught, but
+  `t = os.path.expanduser("~"); shutil.rmtree(t)` is **not** — the dangerous
+  argument no longer sits next to the call. Vouch does no data-flow/taint analysis;
+  "caught" means *this literal shape* is caught, not that the whole category is
+  solved. Treat a `valid` verdict as "no obvious literal red flag," and lean on the
+  `--llm` layer (which reasons about intent) for anything you're granting real
+  access to.
 - **Prose instructions / semantic intent.** A `SKILL.md` is instructions an agent
   will *act on*, but static rules see *patterns*, not *purpose*. By default Vouch
   grades a capability as real ("strong") only when it appears in executable
@@ -249,7 +258,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.9.0
+    rev: v0.9.1
     hooks:
       - id: vouch
 ```
