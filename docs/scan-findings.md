@@ -13,7 +13,7 @@ the same verdict.
 
 ## The headline
 
-- **~1 in 6 skills (16.4%) weren't a clean pass.** 177 were flagged
+- **~1 in 6 skills (16.5%) weren't a clean pass.** 178 were flagged
   *"review this first,"* and 10 tripped hard danger rules.
 - **1 in 7 skills (15.0%, 171 of them) request a dangerous *capability
   combination*** — e.g. the ability to read secrets **and** reach the network,
@@ -21,8 +21,8 @@ the same verdict.
 
 | verdict | count | share |
 |---|---:|---:|
-| valid | 954 | 83.6% |
-| suspicious (review) | 177 | 15.5% |
+| valid | 953 | 83.5% |
+| suspicious (review) | 178 | 15.6% |
 | malicious (hard rule hit) | 10 | 0.9% |
 
 ## The real story isn't malware — it's quiet power
