@@ -4,23 +4,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vouch-agent"
-version = "0.7.2"
-description = "Vouch — the trust layer for AI agents. Vet Skills and agents, profile them with CVs, and vouch only for the safe ones (hybrid static + LLM analysis)."
+version = "0.7.3"
+description = "Security scanner for AI-agent skills: audit every SKILL.md on your machine for malware, prompt injection, and secret exfiltration. Deterministic static analysis (with an optional LLM layer) for Claude, Cursor, and MCP skills — like npm audit / semgrep, but for agent skills."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Wael Abouella" }]
 keywords = [
-  "security",
-  "agents",
+  "ai-agents",
+  "agent-security",
+  "ai-security",
+  "llm-security",
   "skills",
+  "skill-security",
+  "security-scanner",
   "static-analysis",
+  "sast",
+  "supply-chain-security",
   "prompt-injection",
-  "skill-cv",
-  "agent-cv",
-  "vouch",
+  "malware-detection",
+  "secret-exfiltration",
+  "audit",
   "mcp",
-  "cursor-sdk",
+  "claude",
+  "cursor",
+  "vouch",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",

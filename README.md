@@ -7,9 +7,8 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/WaelAbouceo/vouch/badge)](https://securityscorecards.dev/viewer/?uri=github.com/WaelAbouceo/vouch)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 
-**See what your AI agents can actually do.** One command audits every skill
-installed on your machine, tells you in plain English what each one can do, and
-flags the risky ones — deterministically, with zero false alarms.
+**Vouch shows you what your AI agents can actually do.**
+One command scans every skill on your machine, explains in plain English what each one can do, and flags the risky ones.
 
 ![Vouch demo](docs/demo.gif)
 
@@ -230,7 +229,7 @@ jobs:
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/WaelAbouceo/vouch
-    rev: v0.7.2
+    rev: v0.7.3
     hooks:
       - id: vouch
 ```

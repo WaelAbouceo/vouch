@@ -6,7 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.2] - 2026-09-09
+## [0.7.3] - 2026-09-09
+
+### Changed
+- **Positioning + discoverability.** Aligned the package's headline everywhere to
+  "**security scanner for AI-agent skills**" (dropping the stale "trust layer /
+  CVs" framing as the lead). Rewrote the PyPI `description`, refreshed `keywords`
+  (search terms like `security-scanner`, `malware-detection`,
+  `secret-exfiltration`, `supply-chain-security`, `claude`, `cursor`, `mcp`),
+  updated the GitHub repo description, and expanded GitHub topics. No code or API
+  changes — the Skill CV / Agent CV features remain, just no longer the pitch.
 
 ### Added
 - `vouch --audit --reset-baseline` — **greenfield mode**: forget any saved
