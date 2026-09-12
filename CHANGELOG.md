@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `vouch --audit` now also scans skill roots documented by Gemini CLI
+  (`~/.gemini/skills`, `./.gemini/skills`), OpenClaw (`~/.openclaw/skills`),
+  GitHub Copilot (`~/.copilot/skills`, `./.github/skills`) and Codex's
+  admin/system location (`/etc/codex/skills`). Only directories that exist are
+  scanned, as before. (#4)
+
 ## [0.10.0] - 2026-09-09
 
 Addresses first external-tester feedback.

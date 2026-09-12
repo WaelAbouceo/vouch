@@ -225,3 +225,20 @@ def test_reverse_shell_detected_as_shell_capability():
         source="file",
     )
     assert "shell" in active_keys(scan_capabilities(s))
+
+
+def test_known_roots_include_documented_tool_locations(tmp_path, monkeypatch):
+    """Roots documented by Gemini CLI, OpenClaw and GitHub Copilot are scanned when present."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    expected = [
+        tmp_path / ".gemini" / "skills",
+        tmp_path / ".openclaw" / "skills",
+        tmp_path / ".copilot" / "skills",
+        tmp_path / ".github" / "skills",
+    ]
+    for d in expected:
+        d.mkdir(parents=True)
+    resolved = {str(r) for r in known_skill_roots()}
+    for d in expected:
+        assert str(d.resolve()) in resolved
