@@ -41,12 +41,26 @@ _USER_ROOTS = [
     "~/.agents/skills",
     "~/.codex/skills",
     "~/.config/agents/skills",
+    # Gemini CLI user skills: https://geminicli.com/docs/cli/skills/
+    "~/.gemini/skills",
+    # OpenClaw managed/local skills: https://docs.openclaw.ai/tools/skills
+    "~/.openclaw/skills",
+    # GitHub Copilot personal skills:
+    # https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills
+    "~/.copilot/skills",
+    # Codex admin/system skills: https://learn.chatgpt.com/docs/build-skills
+    "/etc/codex/skills",
 ]
 _PROJECT_ROOTS = [
     "./.claude/skills",
     "./.cursor/skills",
     "./.agents/skills",
     "./skills",
+    # Gemini CLI workspace skills: https://geminicli.com/docs/cli/skills/
+    "./.gemini/skills",
+    # GitHub Copilot repository skills:
+    # https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/add-skills
+    "./.github/skills",
 ]
 
 
